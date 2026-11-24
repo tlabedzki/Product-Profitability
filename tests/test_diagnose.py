@@ -54,11 +54,11 @@ def test_profitable_and_small_products_stay_off_the_list(planted):
 
 def test_reason_sentences_name_the_numbers(planted):
     found = diagnosed(planted, bestsellers=8)
-    assert found.loc[1, "reason"] == ("Discounts (on average 60%) took 6 000 zł against a price-list margin of "
-                                      "4 000 zł. Cap the discount at 39% to break even.")
+    assert found.loc[1, "reason"] == ("Discounts (on average 60%) took 6,000 PLN against a price-list margin of "
+                                      "4,000 PLN. Cap the discount at 39% to break even.")
     assert "90% of orders shipped free" in found.loc[2, "reason"]
     assert found.loc[3, "reason"].startswith("6 of 10 units came back (category: 7%), 2 written off")
-    assert found.loc[4, "reason"].endswith("Raise the price by 9 zł (7%) per unit to break even.")
+    assert found.loc[4, "reason"].endswith("Raise the price by 9 PLN (7%) per unit to break even.")
     assert found.loc[7, "reason"].endswith("Delist it: breaking even needs a price rise of 30%.")
 
 

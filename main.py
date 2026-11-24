@@ -20,7 +20,7 @@ OUTPUT_DIR = ROOT / "output"
 
 
 def pln(value: float) -> str:
-    return f"{value:>14,.0f} zł".replace(",", " ")
+    return f"{value:>14,.0f} PLN".replace("-", "−")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -41,7 +41,7 @@ def main(argv: list[str] | None = None) -> int:
     worst = report["difference"].abs().max()
     if worst >= 0.005:
         print(report.to_string(index=False), file=sys.stderr)
-        print(f"Costs do not add up: {worst:.2f} zł lost or doubled", file=sys.stderr)
+        print(f"Costs do not add up: {worst:.2f} PLN lost or doubled", file=sys.stderr)
         return 2
 
     products = margin.product_margins(shop, lines)

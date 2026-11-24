@@ -85,7 +85,7 @@ def _move(row, rules: Rules) -> str:
 
 
 def _pln(value: float) -> str:
-    return f"{value:,.0f} zł".replace(",", " ")
+    return f"{value:,.0f} PLN".replace("-", "−")
 
 
 def _pct(value: float) -> str:
