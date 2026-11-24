@@ -1,36 +1,51 @@
 """
-Data and titles of the margin cascade and of the loss-making bestseller table, computed once for the app, the README
-charts and the animated demo, so the numbers cannot drift apart. Drawing is in figures.py.
+Data and titles of the margin cascade, the category chart and the loss-making bestseller table, computed once for the
+app and the README charts, so the numbers cannot drift apart. Drawing is in figures.py. Every function that writes
+words or numbers for people takes `language` ("en" for the app and the public README, "pl" for the private README).
 """
 from __future__ import annotations
 
 import pandas as pd
 
-from product_profitability.diagnose import DRIVER_LABELS, Rules
-from product_profitability.margin import STEP_LABELS, STEPS
+from product_profitability import i18n
+from product_profitability.diagnose import Rules
+from product_profitability.margin import STEPS
 
-MOVE_LABELS = {"price": "Change the price", "free_shipping": "End free delivery", "delist": "Delist"}
+MOVE_LABELS = i18n.MOVE_LABELS["en"]
 LOSS_COLUMNS = ["product_id", "rank", "product", "category", "units", "return_rate", "net_revenue", "true_margin",
                 "driver", "move", "reason"]
+LOSS_HEADERS = {
+    "en": "| # | Product | Category | Units | True margin | Main cost | Move |",
+    "pl": "| # | Produkt | Kategoria | Sztuki | Marża na czysto | Główny koszt | Ruch |",
+}
 
 
 def compact(value: float, language: str = "en", unit: str = "") -> str:
-    """12345678 -> '12.3M', -72937 -> '−72.9k' (the minus sign, not a hyphen); Polish uses a decimal comma."""
+    """
+    12345678 -> '12.3M' and -72937 -> '−72.9k' (a minus sign, not a hyphen); in Polish '12,3 mln' and '−72,9 tys.'.
+    """
     sign = "−" if value < 0 else ""
     size = abs(value)
-    for limit, suffix in ((1e6, "M"), (1e3, "k")):
+    suffixes = ((1e6, " mln"), (1e3, " tys.")) if language == "pl" else ((1e6, "M"), (1e3, "k"))
+    for limit, suffix in suffixes:
         if size >= limit:
-            text = f"{size / limit:.{2 if size < 10 * limit else 1}f}{suffix}"
+            number = f"{size / limit:.{2 if size < 10 * limit else 1}f}"
+            text = (number.replace(".", ",") if language == "pl" else number) + suffix
             break
     else:
         text = f"{size:.0f}"
-    if language == "pl":
-        text = text.replace(".", ",")
     return f"{sign}{text}{' ' + unit if unit else ''}"
 
 
-def percent(value: float, decimals: int = 0) -> str:
-    return f"{value:.{decimals}%}"
+def percent(value: float, decimals: int = 0, language: str = "en") -> str:
+    text = f"{value:.{decimals}%}".replace("-", "−")
+    return text.replace(".", ",") if language == "pl" else text
+
+
+def money(value: float, language: str = "en") -> str:
+    """Whole złoty: '5,708 PLN' or '5 708 zł'."""
+    text = f"{value:,.0f}".replace("-", "−")
+    return f"{text.replace(',', ' ')} zł" if language == "pl" else f"{text} PLN"
 
 
 def categories(products: pd.DataFrame) -> list[str]:
@@ -38,7 +53,7 @@ def categories(products: pd.DataFrame) -> list[str]:
     return products.groupby("category")["net_revenue"].sum().sort_values(ascending=False).index.tolist()
 
 
-def cascade_data(products: pd.DataFrame, category: str | None = None) -> pd.DataFrame:
+def cascade_data(products: pd.DataFrame, category: str | None = None, language: str = "en") -> pd.DataFrame:
     """
     The bars of the margin cascade of the shop or of one category: the price-list margin, each selling cost as a
     floating bar from the running margin down, and the true margin. The biggest cost is the one to highlight.
@@ -57,7 +72,7 @@ def cascade_data(products: pd.DataFrame, category: str | None = None) -> pd.Data
     rows.append({"step": "true_margin", "kind": "margin", "amount": total["true_margin"], "start": 0.0,
                  "end": total["true_margin"]})
     data = pd.DataFrame(rows)
-    data["label"] = data["step"].map(STEP_LABELS)
+    data["label"] = data["step"].map(i18n.STEP_LABELS[i18n.check(language)])
     list_margin = total["list_margin"]
     data["share"] = data["amount"] / list_margin if list_margin else float("nan")
     costs = data[data["kind"] == "cost"]
@@ -65,39 +80,90 @@ def cascade_data(products: pd.DataFrame, category: str | None = None) -> pd.Data
     return data
 
 
-def cascade_title(data: pd.DataFrame, scope: str = "Lumo", period: tuple | None = None) -> tuple[str, str]:
+def _period(period, language: str) -> str:
+    if not period:
+        return ""
+    start, end = (i18n.month(stamp, language) for stamp in period)
+    return f", {start} – {end}" if language == "pl" else f", {start} to {end}"
+
+
+def cascade_title(data: pd.DataFrame, scope: str = "Lumo", period: tuple | None = None,
+                  language: str = "en") -> tuple[str, str]:
     """A title that states the finding and a subtitle that says how to read the chart."""
     by_step = data.set_index("step")
     list_margin, true_margin = by_step.loc["list_margin", "amount"], by_step.loc["true_margin", "amount"]
-    biggest = data[data["highlight"]].iloc[0]
+    biggest = data[data["highlight"]].iloc[0]["label"].lower()
+    kept = true_margin / list_margin if list_margin > 0 else float("nan")
+    lost = percent(1 - kept, language=language)
+    if language == "pl":
+        if list_margin <= 0:
+            title = f"{scope}: sprzedaż poniżej kosztu zakupu jeszcze przed kosztami sprzedaży"
+        elif true_margin < 0:
+            title = f"{scope} traci na sprzedaży: koszty zabierają {lost} marży z cennika, najwięcej {biggest}"
+        else:
+            title = (f"{scope} zatrzymuje {percent(kept, language='pl')} marży z cennika: koszty sprzedaży zabierają "
+                     f"{lost}, najwięcej {biggest}")
+        subtitle = (f"Marża w zł bez VAT{_period(period, language)}. Od marży z cennika (cena minus koszt zakupu) do "
+                    f"marży po wszystkich kosztach sprzedaży; największy koszt na miedziano.")
+        return title, subtitle
     if list_margin <= 0:
         title = f"{scope} sells below the purchase cost before any selling cost"
     elif true_margin < 0:
-        title = (f"{scope} loses money after selling costs: they take {percent(1 - true_margin / list_margin)} of "
-                 f"the price-list margin, {biggest['label'].lower()} the most")
+        title = (f"{scope} loses money after selling costs: they take {lost} of the price-list margin, "
+                 f"{biggest} the most")
     else:
-        lost = 1 - true_margin / list_margin
-        title = (f"{scope} keeps {percent(true_margin / list_margin)} of its price-list margin: selling costs take "
-                 f"{percent(lost)}, {biggest['label'].lower()} the most")
-    when = f", {period[0]:%b %Y} to {period[1]:%b %Y}" if period else ""
-    subtitle = (f"Margin in PLN without VAT{when}. From the price-list margin (price minus purchase cost) down to "
-                f"the true margin after every selling cost; the biggest cost in copper.")
+        title = (f"{scope} keeps {percent(kept)} of its price-list margin: selling costs take {lost}, "
+                 f"{biggest} the most")
+    subtitle = (f"Margin in PLN without VAT{_period(period, language)}. From the price-list margin (price minus "
+                f"purchase cost) down to the true margin after every selling cost; the biggest cost in copper.")
     return title, subtitle
 
 
-def loss_table(losing: pd.DataFrame) -> pd.DataFrame:
+def category_data(products: pd.DataFrame, language: str = "en") -> pd.DataFrame:
+    """Share of the price-list margin each category keeps after selling costs, the lowest first (highlighted)."""
+    language = i18n.check(language)
+    summed = products.groupby("category")[["list_margin", *STEPS, "true_margin"]].sum()
+    out = pd.DataFrame({
+        "category": summed.index,
+        "label": [i18n.category(name, language) for name in summed.index],
+        "list_margin": summed["list_margin"].to_numpy(),
+        "true_margin": summed["true_margin"].to_numpy(),
+        "kept": (summed["true_margin"] / summed["list_margin"]).to_numpy(),
+        "biggest": summed[list(STEPS)].idxmax(axis=1).map(i18n.STEP_LABELS[language]).str.lower().to_numpy(),
+    }).sort_values(["kept", "category"], ignore_index=True)
+    out["highlight"] = out.index == 0
+    return out
+
+
+def category_title(data: pd.DataFrame, language: str = "en") -> tuple[str, str]:
+    lowest, highest = data.iloc[0], data.iloc[-1]
+    low, high = percent(lowest["kept"], language=language), percent(highest["kept"], language=language)
+    if language == "pl":
+        title = f"{lowest['label']} zatrzymuje najmniej marży z cennika: {low}, najwięcej zabierają {lowest['biggest']}"
+        subtitle = (f"Udział marży z cennika, który zostaje po kosztach sprzedaży, w każdej kategorii; najwięcej "
+                    f"zostaje w kategorii {highest['label']} ({high}).")
+        return title, subtitle
+    title = f"{lowest['label']} keeps the least of its price-list margin: {low}, {lowest['biggest']} take the most"
+    subtitle = (f"Share of the price-list margin left after selling costs, by category; {highest['label']} keeps the "
+                f"most ({high}).")
+    return title, subtitle
+
+
+def loss_table(losing: pd.DataFrame, language: str = "en") -> pd.DataFrame:
     """The loss-making bestsellers as a display table (one row per product, the biggest loss first)."""
+    language = i18n.check(language)
+    colors = losing["color"].fillna("").map(lambda name: i18n.color(name, language))
     table = pd.DataFrame({
         "product_id": losing["product_id"].astype(int),
         "rank": losing["revenue_rank"].astype(int),
-        "product": losing["product_name"] + " (" + losing["color"].fillna("") + ")",
-        "category": losing["category"],
+        "product": losing["product_name"] + " (" + colors + ")",
+        "category": losing["category"].map(lambda name: i18n.category(name, language)),
         "units": losing["units"].astype(int),
         "return_rate": losing["return_rate"].fillna(0.0),
         "net_revenue": losing["net_revenue"],
         "true_margin": losing["true_margin"],
-        "driver": losing["driver"].map(DRIVER_LABELS),
-        "move": losing["move"].map(MOVE_LABELS),
+        "driver": losing["driver"].map(i18n.DRIVER_LABELS[language]),
+        "move": losing["move"].map(i18n.MOVE_LABELS[language]),
         "reason": losing["reason"],
     })
     table["product"] = table["product"].str.replace(" ()", "", regex=False)
@@ -107,6 +173,13 @@ def loss_table(losing: pd.DataFrame) -> pd.DataFrame:
 def loss_title(losing: pd.DataFrame, rules: Rules | None = None, language: str = "en") -> tuple[str, str]:
     rules = rules or Rules()
     count, loss = len(losing), float(losing["true_margin"].sum())
+    if language == "pl":
+        if count == 0:
+            return (f"Każdy z {rules.bestsellers} bestsellerów zarabia po wszystkich kosztach sprzedaży",
+                    "Bestsellery to produkty z najwyższym przychodem netto.")
+        return (f"{count} z {rules.bestsellers} bestsellerów traci pieniądze, razem {compact(loss, 'pl', 'zł')}",
+                f"Bestsellery to {rules.bestsellers} produktów z najwyższym przychodem netto. Przy każdym koszt, który "
+                f"go pogrążył, i jeden ruch: zmiana ceny, koniec darmowej dostawy albo wycofanie.")
     if count == 0:
         title = f"All top {rules.bestsellers} bestsellers make money after every selling cost"
     else:
@@ -118,10 +191,10 @@ def loss_title(losing: pd.DataFrame, rules: Rules | None = None, language: str =
 
 def loss_markdown(table: pd.DataFrame, rows: int = 10, language: str = "en") -> str:
     """The first rows of the loss table in Markdown for the README (pipes in names escaped)."""
-    lines = ["| # | Product | Category | Units | True margin | Move | Why |", "|---:|---|---|---:|---:|---|---|"]
+    lines = [LOSS_HEADERS[i18n.check(language)], "|---:|---|---|---:|---:|---|---|"]
     for row in table.head(rows).itertuples(index=False):
-        cells = [str(row.rank), row.product, row.category, str(row.units),
-                 compact(row.true_margin, language, "PLN"), row.move, row.reason]
+        cells = [str(row.rank), row.product, row.category, str(row.units), money(row.true_margin, language),
+                 row.driver, row.move]
         lines.append("| " + " | ".join(cell.replace("|", "\\|") for cell in cells) + " |")
     return "\n".join(lines)
 

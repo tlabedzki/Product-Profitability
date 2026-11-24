@@ -49,7 +49,7 @@ def value_labels(data: pd.DataFrame, language: str = "en") -> list[str]:
 
 def axis_labels(data: pd.DataFrame) -> list[str]:
     """Step names on the axis; no hyphen, which tabular figures in chart text space out."""
-    return [label.replace("Price-list", "Price list") for label in data["label"]]
+    return [str(label).replace("Price-list", "Price list") for label in data["label"]]
 
 
 def cascade(data: pd.DataFrame, language: str = "en", height: int | None = None) -> go.Figure:
@@ -84,3 +84,21 @@ def cascade(data: pd.DataFrame, language: str = "en", height: int | None = None)
     # Value labels sit outside the bars: keep room for them in pixels, so they fit on a 390 px phone too.
     return _layout(fig, height or 44 * len(data) + 24, bargap=0.32,
                    margin={"l": 8, "r": 64, "t": 12, "b": 8})
+
+
+def category_kept(data: pd.DataFrame, language: str = "en", height: int | None = None) -> go.Figure:
+    """Share of the price-list margin kept, by category: mist bars, the lowest one in copper, labels at the bars."""
+    colors = [t.ACCENT if highlight else t.MIST for highlight in data["highlight"]]
+    labels = [report.percent(value, language=language) for value in data["kept"]]
+    fig = go.Figure()
+    fig.add_bar(
+        y=data["label"], x=data["kept"], orientation="h", marker={"color": colors}, text=labels,
+        textposition="outside", cliponaxis=False,
+        textfont=_num(13, [t.INK if highlight else t.TEXT for highlight in data["highlight"]]),
+        customdata=data[["biggest"]], hovertemplate="%{y}<br><b>%{text}</b> kept<br>biggest cost: %{customdata[0]}"
+                                                    "<extra></extra>",
+    )
+    fig.update_yaxes(autorange="reversed", showgrid=False, showline=False, ticks="", tickfont={"color": t.TEXT},
+                     fixedrange=True, ticklabelstandoff=8)
+    fig.update_xaxes(visible=False, range=[0, 1.0], fixedrange=True)
+    return _layout(fig, height or 30 * len(data) + 24, bargap=0.28, margin={"l": 8, "r": 48, "t": 8, "b": 8})

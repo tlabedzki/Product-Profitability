@@ -77,3 +77,16 @@ def test_break_even_rise_really_breaks_even(planted):
 def test_biggest_loss_first(planted):
     found = diagnose.loss_making_bestsellers(planted, diagnose.Rules(bestsellers=8))
     assert found["true_margin"].is_monotonic_increasing
+
+
+def test_polish_reasons_carry_the_same_facts(planted):
+    found = diagnose.loss_making_bestsellers(planted, diagnose.Rules(bestsellers=8), language="pl").set_index(
+        "product_id")
+    assert found.loc[1, "reason"] == ("Rabaty (średnio 60%) zabrały 6 000 zł przy marży z cennika 4 000 zł. "
+                                      "Ogranicz rabat do 39%, żeby wyjść na zero.")
+    assert found.loc[2, "reason"].endswith("Wyłącz go z darmowej dostawy albo dolicz opłatę za dostawę.")
+    assert found.loc[3, "reason"].startswith("Wróciło 6 z 10 sztuk (kategoria: 7%), 2 do odpisu")
+    assert found.loc[4, "reason"].endswith("Podnieś cenę o 9 zł (7%) na sztuce, żeby wyjść na zero.")
+    assert found.loc[7, "reason"].endswith("Wycofaj go: wyjście na zero wymaga podwyżki o 30%.")
+    english = diagnose.loss_making_bestsellers(planted, diagnose.Rules(bestsellers=8)).set_index("product_id")
+    assert (found["move"] == english["move"]).all()

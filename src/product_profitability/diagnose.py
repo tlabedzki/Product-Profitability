@@ -45,7 +45,8 @@ def category_return_rates(products: pd.DataFrame) -> pd.Series:
     return summed["units_refunded"] / summed["units"].where(summed["units"] > 0)
 
 
-def add_diagnosis(products: pd.DataFrame, all_products: pd.DataFrame, rules: Rules = Rules()) -> pd.DataFrame:
+def add_diagnosis(products: pd.DataFrame, all_products: pd.DataFrame, rules: Rules = Rules(),
+                  language: str = "en") -> pd.DataFrame:
     """Add driver, break-even price rise, move and a reason sentence to every row (meant for loss-makers)."""
     out = products.copy()
     steps = out[list(STEPS)]
@@ -63,15 +64,16 @@ def add_diagnosis(products: pd.DataFrame, all_products: pd.DataFrame, rules: Rul
     # The biggest average discount that still breaks even (the other costs kept as they are).
     out["break_even_discount_rate"] = ((out["discount"] + out["true_margin"]) / revenue).fillna(0.0)
     out["move"] = [_move(row, rules) for row in out.itertuples(index=False)]
-    out["reason"] = [_reason(row) + " " + _action(row, rules) for row in out.itertuples(index=False)]
+    write = (_reason, _action) if language == "en" else (_reason_pl, _action_pl)
+    out["reason"] = [write[0](row) + " " + write[1](row, rules) for row in out.itertuples(index=False)]
     return out
 
 
-def loss_making_bestsellers(products: pd.DataFrame, rules: Rules = Rules()) -> pd.DataFrame:
+def loss_making_bestsellers(products: pd.DataFrame, rules: Rules = Rules(), language: str = "en") -> pd.DataFrame:
     """Bestsellers with a negative true margin, the biggest loss first, with driver, move and reason."""
     top = bestsellers(products, rules)
     losing = top[top["true_margin"] < 0]
-    return add_diagnosis(losing, products, rules).sort_values("true_margin", ignore_index=True)
+    return add_diagnosis(losing, products, rules, language).sort_values("true_margin", ignore_index=True)
 
 
 def _move(row, rules: Rules) -> str:
@@ -120,3 +122,45 @@ def _action(row, rules: Rules) -> str:
         return f"Cap the discount at {_pct(row.break_even_discount_rate)} to break even."
     return (f"Raise the price by {_pln(row.break_even_rise)} ({_pct(row.break_even_rise_rate)}) per unit to break "
             f"even.")
+
+
+# Polish sentences for the README while the repository is private (same facts as _reason and _action).
+
+def _zl(value: float) -> str:
+    return f"{value:,.0f} zł".replace(",", " ").replace("-", "−")
+
+
+def _pct_pl(value: float) -> str:
+    return f"{value:.0%}"
+
+
+OTHER_DRIVERS_PL = {"payment": "Opłaty za płatność zabrały", "commission": "Prowizja afiliacyjna zabrała"}
+
+
+def _reason_pl(row) -> str:
+    against = f"przy marży z cennika {_zl(row.list_margin)}"
+    if row.driver == "price_list":
+        return f"Sprzedawany po koszcie zakupu albo poniżej: marża z cennika to {_zl(row.list_margin)}."
+    if row.driver == "discount":
+        return f"Rabaty (średnio {_pct_pl(row.discount_rate)}) zabrały {_zl(row.discount)} {against}."
+    if row.driver == "returns":
+        written = f", {row.units_written_off:.0f} do odpisu" if row.units_written_off else ""
+        return (f"Wróciło {row.units_refunded:.0f} z {row.units:.0f} sztuk (kategoria: "
+                f"{_pct_pl(row.category_return_rate)}){written}; zwroty kosztowały {_zl(row.returns)} {against}.")
+    if row.driver == "shipping":
+        return (f"Wysyłka kosztowała o {_zl(row.shipping)} więcej, niż zapłacili klienci, "
+                f"{_pct_pl(row.free_delivery_share)} zamówień z darmową dostawą, {against}.")
+    return f"{OTHER_DRIVERS_PL[row.driver]} {_zl(getattr(row, row.driver))} {against}."
+
+
+def _action_pl(row, rules: Rules) -> str:
+    if row.move == "free_shipping":
+        return "Wyłącz go z darmowej dostawy albo dolicz opłatę za dostawę."
+    if row.move == "delist":
+        if row.driver == "returns":
+            return "Wycofaj go albo zmień dostawcę."
+        return f"Wycofaj go: wyjście na zero wymaga podwyżki o {_pct_pl(row.break_even_rise_rate)}."
+    if row.driver == "discount" and row.break_even_discount_rate >= rules.min_discount_cap:
+        return f"Ogranicz rabat do {_pct_pl(row.break_even_discount_rate)}, żeby wyjść na zero."
+    return (f"Podnieś cenę o {_zl(row.break_even_rise)} ({_pct_pl(row.break_even_rise_rate)}) na sztuce, żeby wyjść "
+            f"na zero.")

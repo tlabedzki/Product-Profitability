@@ -16,7 +16,8 @@ def test_compact_numbers():
     assert report.compact(-72_937) == "−72.9k"
     assert report.compact(-5_708, unit="PLN") == "−5.71k PLN"
     assert report.compact(435) == "435"
-    assert report.compact(2_468_783, "pl") == "2,47M"
+    assert report.compact(2_468_783, "pl") == "2,47 mln"
+    assert report.compact(-72_937, "pl", "zł") == "−72,9 tys. zł"
 
 
 def test_cascade_runs_from_list_margin_to_true_margin(products):
@@ -121,3 +122,32 @@ def test_product_orders_list_every_line_with_its_margin(tiny_shop):
     assert table.set_index("order_id").loc[2, "status"] == "payment failed"
     assert table["true_margin"].sum() == pytest.approx(
         margin.product_margins(tiny_shop).set_index("product_id").loc[1, "true_margin"])
+
+
+def test_polish_cascade_labels_and_title(products):
+    data = report.cascade_data(products, language="pl")
+    assert data["label"].tolist()[0] == "Marża z cennika" and data["label"].tolist()[-1] == "Marża na czysto"
+    title, subtitle = report.cascade_title(data, "Lumo", (pd.Timestamp("2023-01-01"), pd.Timestamp("2024-12-31")),
+                                           language="pl")
+    assert title == "Lumo traci na sprzedaży: koszty zabierają 111% marży z cennika, najwięcej wysyłka"
+    assert "sty 2023 – gru 2024" in subtitle
+    with pytest.raises(ValueError, match="Unknown language"):
+        report.cascade_data(products, language="de")
+
+
+def test_category_data_lowest_first_and_highlighted(products):
+    data = report.category_data(products, language="pl")
+    assert data["label"].tolist() == ["Meble", "Dom i ogród"]  # Furniture loses money, Home & Garden keeps some
+    assert data["highlight"].tolist() == [True, False]
+    assert data["kept"].iloc[0] < data["kept"].iloc[1]
+    title, _ = report.category_title(data, language="pl")
+    assert title.startswith("Meble zatrzymuje najmniej marży z cennika: −")
+    fig = figures.category_kept(data, language="pl")
+    assert list(fig.data[0].marker.color) == [t.ACCENT, t.MIST]
+
+
+def test_polish_loss_markdown(products):
+    losing = diagnose.loss_making_bestsellers(products, diagnose.Rules(bestsellers=2), language="pl")
+    markdown = report.loss_markdown(report.loss_table(losing, "pl"), language="pl")
+    assert markdown.splitlines()[0] == report.LOSS_HEADERS["pl"]
+    assert "| Sofa Big (szary) | Meble | 2 | −39 zł | wysyłka | Bez darmowej dostawy |" in markdown
