@@ -10,8 +10,8 @@ from product_profitability.diagnose import DRIVER_LABELS, Rules
 from product_profitability.margin import STEP_LABELS, STEPS
 
 MOVE_LABELS = {"price": "Change the price", "free_shipping": "End free delivery", "delist": "Delist"}
-LOSS_COLUMNS = ["rank", "product", "category", "units", "return_rate", "net_revenue", "true_margin", "driver",
-                "move", "reason"]
+LOSS_COLUMNS = ["product_id", "rank", "product", "category", "units", "return_rate", "net_revenue", "true_margin",
+                "driver", "move", "reason"]
 
 
 def compact(value: float, language: str = "en", unit: str = "") -> str:
@@ -88,6 +88,7 @@ def cascade_title(data: pd.DataFrame, scope: str = "Lumo", period: tuple | None 
 def loss_table(losing: pd.DataFrame) -> pd.DataFrame:
     """The loss-making bestsellers as a display table (one row per product, the biggest loss first)."""
     table = pd.DataFrame({
+        "product_id": losing["product_id"].astype(int),
         "rank": losing["revenue_rank"].astype(int),
         "product": losing["product_name"] + " (" + losing["color"].fillna("") + ")",
         "category": losing["category"],
@@ -100,7 +101,7 @@ def loss_table(losing: pd.DataFrame) -> pd.DataFrame:
         "reason": losing["reason"],
     })
     table["product"] = table["product"].str.replace(" ()", "", regex=False)
-    return table.sort_values("true_margin", ignore_index=True)[LOSS_COLUMNS]
+    return table.sort_values(["true_margin", "product_id"], ignore_index=True)[LOSS_COLUMNS]
 
 
 def loss_title(losing: pd.DataFrame, rules: Rules | None = None, language: str = "en") -> tuple[str, str]:
@@ -123,3 +124,41 @@ def loss_markdown(table: pd.DataFrame, rows: int = 10, language: str = "en") -> 
                  compact(row.true_margin, language, "PLN"), row.move, row.reason]
         lines.append("| " + " | ".join(cell.replace("|", "\\|") for cell in cells) + " |")
     return "\n".join(lines)
+
+
+ORDER_COLUMNS = ["order_date", "order_id", "status", "units", "unit_price_gross", "discount_rate", "delivery",
+                 "payment", "channel", "returned", "true_margin"]
+
+
+def product_label(row) -> str:
+    color = f" ({row.color})" if isinstance(row.color, str) and row.color else ""
+    return f"{row.product_name}{color}"
+
+
+def product_options(products: pd.DataFrame, limit: int = 2000) -> list[dict[str, str]]:
+    """The products to pick a card from: the `limit` biggest by net revenue, as Select options."""
+    top = products.sort_values(["net_revenue", "product_id"], ascending=[False, True]).head(limit)
+    return [{"value": str(row.product_id), "label": f"{product_label(row)} · #{rank}"}
+            for rank, row in enumerate(top.itertuples(index=False), start=1)]
+
+
+def product_orders(orders: pd.DataFrame, returns: pd.DataFrame, lines: pd.DataFrame, product_id: int) -> pd.DataFrame:
+    """Every order line of one product with its true margin, the newest first (fraud orders are not in `lines`)."""
+    from product_profitability.margin import add_steps
+
+    own = add_steps(lines[lines["product_id"] == product_id])
+    info = orders[["order_line_id", "order_date", "order_status", "unit_price_gross", "discount_rate",
+                   "delivery_method", "payment_method", "channel", "quantity"]]
+    back = returns.groupby("order_line_id").agg(reason=("return_reason", "first"), state=("return_status", "first"),
+                                                back=("returned_quantity", "sum"))
+    table = own.merge(info, on="order_line_id", how="left").join(back, on="order_line_id")
+    returned = [f"{int(n)} × {reason.replace('_', ' ')} ({state})" if isinstance(reason, str) else ""
+                for n, reason, state in zip(table["back"], table["reason"], table["state"], strict=True)]
+    out = pd.DataFrame({
+        "order_date": table["order_date"], "order_id": table["order_id"],
+        "status": table["order_status"].str.replace("_", " "), "units": table["quantity"].astype(int),
+        "unit_price_gross": table["unit_price_gross"], "discount_rate": table["discount_rate"],
+        "delivery": table["delivery_method"], "payment": table["payment_method"], "channel": table["channel"],
+        "returned": returned, "true_margin": table["true_margin"],
+    })
+    return out.sort_values(["order_date", "order_id"], ascending=False, ignore_index=True)[ORDER_COLUMNS]

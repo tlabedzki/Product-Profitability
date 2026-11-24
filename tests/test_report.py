@@ -84,10 +84,40 @@ def test_cascade_figure_colors_and_labels(products):
     assert bar.marker.color[0] == t.PRIMARY and bar.marker.color[-1] == t.PRIMARY
     assert bar.text[0] == report.compact(data["amount"].iloc[0])
     assert all(label.startswith(("−", "+", "0")) for label in bar.text[1:-1])
-    assert len(fig.layout.shapes) == len(data) - 2
+    assert bar.orientation == "h" and list(bar.y) == figures.axis_labels(data)
+    assert bar.y[0] == "Price list margin" and bar.y[-1] == "True margin"
+    assert len(fig.layout.shapes) == len(data) - 2 + 1  # connectors and the zero line (the tiny shop loses money)
     assert fig.layout.xaxis.fixedrange and fig.layout.dragmode is False
+
+
+def test_no_zero_line_when_every_bar_is_positive():
+    data = pd.DataFrame({"step": ["list_margin", "discount", "true_margin"], "kind": ["margin", "cost", "margin"],
+                         "amount": [100.0, 20.0, 80.0], "start": [0.0, 100.0, 0.0], "end": [100.0, 80.0, 80.0],
+                         "label": ["Price-list margin", "Discounts", "True margin"], "share": [1.0, 0.2, 0.8],
+                         "highlight": [False, True, False]})
+    assert len(figures.cascade(data).layout.shapes) == 1
 
 
 def test_delivery_income_gets_a_plus_sign():
     data = pd.DataFrame({"kind": ["margin", "cost", "margin"], "amount": [100.0, -20.0, 120.0]})
     assert figures.value_labels(data) == ["100", "+20", "120"]
+
+
+def test_product_options_by_revenue(products):
+    options = report.product_options(products)
+    assert [o["value"] for o in options] == ["2", "1"]
+    assert options[0]["label"] == "Sofa Big (gray) · #1"
+    assert len(report.product_options(products, limit=1)) == 1
+
+
+def test_product_orders_list_every_line_with_its_margin(tiny_shop):
+    lines = margin.line_costs(tiny_shop)
+    table = report.product_orders(tiny_shop.orders, tiny_shop.returns, lines, 1)
+    assert table.columns.tolist() == report.ORDER_COLUMNS
+    assert table["order_id"].tolist() == [4, 2, 1]  # newest first, fraud order 3 left out
+    first = table.set_index("order_id").loc[1]
+    assert first["returned"] == "1 × defective (refunded)"
+    assert first["true_margin"] == pytest.approx(100 - 116.5 - 80 * 20 / 90 - 10 * 2 / 3 - 6)
+    assert table.set_index("order_id").loc[2, "status"] == "payment failed"
+    assert table["true_margin"].sum() == pytest.approx(
+        margin.product_margins(tiny_shop).set_index("product_id").loc[1, "true_margin"])

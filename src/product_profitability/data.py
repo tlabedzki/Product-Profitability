@@ -11,7 +11,7 @@ from product_profitability import mock_costs
 
 ROOT = Path(__file__).resolve().parents[2]
 RAW_DIR = ROOT / "data" / "raw"
-DATA_GENERATOR_TAG = "v1.6.0"
+DATA_GENERATOR_TAG = "v1.7.1"
 TABLES = ("product_data", "order_data", "shipment_data", "return_data", "payment_data")
 
 BASE_COLUMNS = {
