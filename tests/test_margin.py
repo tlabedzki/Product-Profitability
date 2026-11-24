@@ -70,3 +70,14 @@ def test_a_line_without_its_product_is_an_error(tiny_shop):
     tiny_shop.products = tiny_shop.products[tiny_shop.products["product_id"] != 2]
     with pytest.raises(ValueError, match="a product is missing"):
         margin.line_costs(tiny_shop)
+
+
+def test_net_revenue_comes_from_gross_prices_not_the_net_columns(tiny_shop):
+    # Data-Generator before 1.7.1 had "net" columns that did not match VAT 23%; the model never reads them.
+    from product_profitability.data import BASE_COLUMNS
+
+    assert "unit_price_net" not in BASE_COLUMNS["order_data"]
+    assert "sales_price_net" not in BASE_COLUMNS["product_data"]
+    before = margin.product_margins(tiny_shop)["true_margin"].sum()
+    tiny_shop.truth = {"vat_rate": 0.08}
+    assert margin.product_margins(tiny_shop)["true_margin"].sum() != pytest.approx(before)
