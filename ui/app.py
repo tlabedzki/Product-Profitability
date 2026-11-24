@@ -5,7 +5,8 @@ or a category, the bestsellers that lose money (live rules) and the card of one 
 Run locally (from the repository root):
     python -m ui.app            # http://127.0.0.1:8050
 
-A product card can be opened from the address: /?product=209170. The server listens on 127.0.0.1 only.
+The address can set the sliders and the product card, so a view is a link: /?bestsellers=200&rise=15&product=209170.
+The server listens on 127.0.0.1 only.
 """
 from __future__ import annotations
 
@@ -13,13 +14,13 @@ import os
 import sys
 from functools import cache, lru_cache
 from pathlib import Path
+from urllib.parse import parse_qs
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 import dash._dash_renderer  # noqa: E402
 import dash_mantine_components as dmc  # noqa: E402
-import flask  # noqa: E402
 import pandas as pd  # noqa: E402
 from dash import ALL, Dash, Input, Output, ctx, dcc, html, no_update  # noqa: E402
 
@@ -121,15 +122,29 @@ def stat(label, value, note="", extra_class=""):
                      html.Div(note, className="dg-stat-note")], className=f"dg-stat {extra_class}".strip())
 
 
-def rule_slider(name):
+def start_values(args) -> dict[str, float]:
+    """Slider values from the address (/?bestsellers=200&rise=15), clipped to the slider range; defaults otherwise."""
+    values = {}
+    for name, (_, _, low, high, step, default, _) in RULES.items():
+        try:
+            value = float(args.get(name, default))
+        except (TypeError, ValueError):
+            value = default
+        value = min(max(value, low), high)
+        values[name] = int(round(value / step) * step)
+    return values
+
+
+def rule_slider(name, value=None):
     label, help_text, low, high, step, default, (prefix, decimals, suffix) = RULES[name]
+    value = default if value is None else value
     return html.Div([
         html.Div([dmc.Text(label, className="dg-label"),
-                  html.Span(rule_text(name, default), id=f"{name}-value", className="pp-rule-value",
+                  html.Span(rule_text(name, value), id=f"{name}-value", className="pp-rule-value",
                             **{"data-prefix": prefix, "data-decimals": str(decimals), "data-suffix": suffix})],
                  className="pp-rule-head"),
         dmc.Text(help_text, className="dg-caption pp-rule-help"),
-        dmc.Slider(id=name, min=low, max=high, step=step, value=default, color="petrol", size="sm", label=None,
+        dmc.Slider(id=name, min=low, max=high, step=step, value=value, color="petrol", size="sm", label=None,
                    updatemode="mouseup", className="pp-slider"),
     ], className="pp-rule")
 
@@ -287,10 +302,8 @@ def page():
         body = [hero, section(1, "Margin", "The shop data is missing or incomplete.",
                               html.P(problem, className="dg-placeholder"), "cascade")]
     else:
-        try:
-            requested = flask.request.args.get("product")
-        except RuntimeError:  # outside a request (tests)
-            requested = None
+        # The address (?bestsellers=…&rise=…&product=…) is read by apply_address: Dash fetches this layout with a
+        # request of its own, which does not carry the page's query string.
         categories = [{"value": ALL_CATEGORIES, "label": "All categories"}] + [
             {"value": c, "label": c} for c in report.categories(products)]
         source = shop.truth.get("source", {})
@@ -309,7 +322,7 @@ def page():
             ], "losses"),
             section(3, "Product card", "One product: its own cascade and every order line behind it.", [
                 dmc.Select(id="product", data=product_choices()[0],
-                           value=start_product(requested), label="Product (top 2,000 by net revenue)",
+                           value=start_product(None), label="Product (top 2,000 by net revenue)",
                            searchable=True, allowDeselect=False, className="pp-product-select", size="md",
                            maxDropdownHeight=320),
                 html.Div(id="card", className="pp-block"),
@@ -324,7 +337,7 @@ def page():
         html.A(REPO_URL.removeprefix("https://"), href=REPO_URL, target="_blank", className="dg-link"),
     ], className="dg-footer")
     return dmc.MantineProvider(theme=t.MANTINE_THEME, children=html.Div([
-        dcc.Store(id="scroll-to-card"), dcc.Store(id="scroll-done"),
+        dcc.Location(id="url", refresh=False), dcc.Store(id="scroll-to-card"), dcc.Store(id="scroll-done"),
         header,
         html.Main(html.Div([*body, footer], className="dg-wrap")),
     ], className="dg-page"))
@@ -336,6 +349,17 @@ def page():
 app = Dash(__name__, title="Product Profitability", assets_folder=str(Path(__file__).parent / "assets"),
            suppress_callback_exceptions=True)
 app.layout = page
+
+
+@app.callback(
+    *[Output(name, "value") for name in RULES], Output("product", "value", allow_duplicate=True),
+    Input("url", "search"), prevent_initial_call="initial_duplicate",
+)
+def apply_address(search):
+    """Sliders and product card from the address when the page opens (/?bestsellers=200&rise=15&product=…)."""
+    query = {key: values[0] for key, values in parse_qs((search or "").lstrip("?")).items()}
+    values = start_values(query)
+    return *[values[name] for name in RULES], start_product(query.get("product"))
 
 
 @app.callback(Output("cascade-view", "children"), Input("category", "value"), prevent_initial_call=True)

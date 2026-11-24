@@ -136,3 +136,19 @@ def test_page_with_broken_cost_data_shows_the_reason(monkeypatch):
 
     monkeypatch.setattr(ui_app, "prepare", broken)
     assert "missing: return_data.handling_cost" in text_of(ui_app.page())
+
+
+def test_slider_values_from_the_address():
+    assert ui_app.start_values({}) == {"bestsellers": 500, "rise": 10}
+    assert ui_app.start_values({"bestsellers": "240", "rise": "15"}) == {"bestsellers": 200, "rise": 15}
+    assert ui_app.start_values({"bestsellers": "99999", "rise": "-3"}) == {"bestsellers": 2000, "rise": 0}
+    assert ui_app.start_values({"bestsellers": "many"}) == {"bestsellers": 500, "rise": 10}
+
+
+def test_the_address_sets_the_sliders_and_the_card(shop_app):
+    # Dash loads the layout with a request of its own, so the address goes through dcc.Location and this callback.
+    app, _ = shop_app
+    assert app.apply_address("?bestsellers=200&rise=20&product=1") == (200, 20, "1")
+    assert app.apply_address("") == (500, 10, "2")
+    assert app.apply_address("?product=999") == (500, 10, "2")
+    assert "url" in ids(app.page())
