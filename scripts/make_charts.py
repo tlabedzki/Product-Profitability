@@ -24,6 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
 
+import make_demo_svg  # noqa: E402
 from browser import Browser, stop_tree, wait_for  # noqa: E402
 
 from product_profitability import data, diagnose, figures, i18n, margin, report  # noqa: E402
@@ -81,7 +82,7 @@ def blocks(numbers: dict) -> dict[str, str]:
     grosz = f"{worst_diff:.2f}".replace(".", "," if language == "pl" else ".")
     p = lambda value: report.percent(value, language=language)  # noqa: E731
     lowest, highest = categories.iloc[0], categories.iloc[-1]
-    hero_alt_numbers = report.loss_title(losing, rules, language)[0]
+    hero = picture(make_demo_svg.alt_text(make_demo_svg.numbers(), language))
     cascade_alt = report.cascade_title(report.cascade_data(products, language=language), "Lumo", None, language)[0]
     category_alt = report.category_title(categories, language)[0]
     discount_returns = p((cascade.loc["discount", "amount"] + cascade.loc["returns", "amount"]) / lm)
@@ -93,8 +94,7 @@ def blocks(numbers: dict) -> dict[str, str]:
                        f"zabierają {first['label'].lower()} ({c(first['amount'])} zł) i "
                        f"{second['label'].lower()} ({c(second['amount'])} zł). {len(losing)} z {rules.bestsellers} "
                        f"bestsellerów traci pieniądze, razem {c(-losing['true_margin'].sum())} zł."),
-            "hero": (f"![Aplikacja: suwaki reguł, liczby i tabela stratnych bestsellerów; {hero_alt_numbers}]"
-                     f"(docs/img/app.png)"),
+            "hero": hero,
             "summary": (
                 f"- **Trafione:** każdy z {sources} kosztów rozkłada się na produkty co do grosza (największa różnica "
                 f"{grosz} zł). Na minusie jest {n(losing_all)} z {n(sold)} sprzedanych produktów, ale tylko "
@@ -125,8 +125,7 @@ def blocks(numbers: dict) -> dict[str, str]:
                    f"{first['label']} ({c(first['amount'])} PLN) and {second['label'].lower()} "
                    f"({c(second['amount'])} PLN) take the most. {len(losing)} of the top {rules.bestsellers} "
                    f"bestsellers lose money, {c(-losing['true_margin'].sum())} PLN together."),
-        "hero": (f"![The app: rule sliders, headline numbers and the table of loss-making bestsellers; "
-                 f"{hero_alt_numbers}](docs/img/app.png)"),
+        "hero": hero,
         "summary": (
             f"- **What worked:** each of the {sources} costs is spread over products to the grosz (largest difference "
             f"{grosz} PLN). {n(losing_all)} of {n(sold)} products sold lose money, but only {len(losing)} of "
@@ -150,13 +149,23 @@ def blocks(numbers: dict) -> dict[str, str]:
     }
 
 
+def picture(alt: str) -> str:
+    """The animated demo (scripts/make_demo_svg.py) in a light and a dark file, chosen by the reader's theme."""
+    return chr(10).join([
+        "<picture>",
+        '  <source media="(prefers-color-scheme: dark)" srcset="docs/img/app-demo-dark.svg">',
+        f'  <img alt="{alt}" src="docs/img/app-demo.svg">',
+        "</picture>",
+    ])
+
+
 def wrap(text: str, width: int = 120) -> str:
     """Wrap prose lines and list items of a block at `width` characters; tables and images stay as they are."""
     out = []
     for line in text.splitlines():
         # Keep "2 167", "16,5 mln" and "435 PLN" on one line: a non-breaking space inside numbers and before units.
         line = re.sub(r"(?<=\d) (?=\d|mln|tys\.|zł|PLN)", " ", line)
-        if line.startswith(("|", "![")) or len(line) <= width:
+        if line.lstrip().startswith(("|", "![", "<")) or len(line) <= width:
             out.append(line)
         elif line.startswith("- "):
             out.append(textwrap.fill(line, width, subsequent_indent="  ", break_long_words=False,
@@ -250,12 +259,8 @@ async def app_shots(port: int) -> None:
                          "document.querySelectorAll('#card tbody tr').length > 0 && "
                          "document.fonts.status === 'loaded'")
         await asyncio.sleep(1.5)
-        await page.js("document.getElementById('losses').scrollIntoView()")
-        await page.js("document.querySelector('#losses .dg-table-scroll').style.maxHeight = '360px'")
-        await asyncio.sleep(0.5)
-        await page.shot("#losses", IMG / "app.png", pad=APP_PAD)
         await page.shot("#product-card", IMG / "app-card.png", pad=APP_PAD)
-        print("Saved docs/img/app.png and docs/img/app-card.png")
+        print("Saved docs/img/app-card.png (the hero is scripts/make_demo_svg.py)")
 
 
 def run_app_shots() -> None:

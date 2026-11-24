@@ -25,3 +25,11 @@ def test_tables_and_images_are_not_wrapped():
 
 def test_no_one_letter_word_at_a_line_end():
     assert make_charts.keep_together("zostaje w kategorii i dalej") == f"zostaje w{NBSP}kategorii i{NBSP}dalej"
+
+
+def test_hero_is_a_picture_with_a_dark_source_and_is_not_wrapped():
+    block = make_charts.picture("Demo: the slider moves from the top 500 to the top 200. " * 4)
+    assert block.splitlines()[0] == "<picture>" and block.splitlines()[-1] == "</picture>"
+    assert 'media="(prefers-color-scheme: dark)" srcset="docs/img/app-demo-dark.svg"' in block
+    assert 'src="docs/img/app-demo.svg"' in block
+    assert make_charts.wrap(block, width=60) == block

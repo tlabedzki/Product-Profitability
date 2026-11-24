@@ -21,7 +21,10 @@ rabaty (2,47 mln zł). 44 z 500 bestsellerów traci pieniądze, razem 73,0 tys
 <!-- /generated:result -->
 
 <!-- generated:hero -->
-![Aplikacja: suwaki reguł, liczby i tabela stratnych bestsellerów; 44 z 500 bestsellerów traci pieniądze, razem −73,0 tys. zł](docs/img/app.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/app-demo-dark.svg">
+  <img alt="Aplikacja Product Profitability w ilustracji: suwak bestsellerów przesuwa się z top 500 na top 200, liczba stratnych bestsellerów zmienia się z 44 na 20, a strata razem z −73.0k na −34.0k PLN; kliknięcie produktu Laptop Lenovo IdeaPad Slim 5 (gray) w tabeli otwiera jego kartę z kaskadą marży i listą zamówień." src="docs/img/app-demo.svg">
+</picture>
 <!-- /generated:hero -->
 
 **Stack:** Python · SQL · DuckDB · pandas · Plotly · Dash · pytest
@@ -229,8 +232,9 @@ sklepu i stratne bestsellery oraz zapisuje `output/product_margins.csv` i `outpu
 
 ### Aplikacja
 
-`python -m ui.app` uruchamia aplikację pod adresem http://127.0.0.1:8050 (tylko na tym komputerze). Kartę produktu
-otwiera też adres `/?product=<id>`. Zatrzymanie: Ctrl+C.
+`python -m ui.app` uruchamia aplikację pod adresem http://127.0.0.1:8050 (tylko na tym komputerze). Suwaki i kartę
+produktu ustawia też adres, więc widok można zapisać jako link: `/?bestsellers=200&rise=15&product=<id>`.
+Zatrzymanie: Ctrl+C.
 
 ## Dane
 
@@ -280,7 +284,8 @@ Pełny opis kolumn wejścia i wyniku: [docs/columns.md](docs/columns.md).
 ```
 main.py                         wiersz poleceń: kaskada, stratne bestsellery, pliki CSV
 scripts/get_data.py             dane z Data-Generatora (tag, ziarno 42) do data/raw/
-scripts/make_charts.py          wykresy, zrzuty aplikacji i bloki liczb w README
+scripts/make_charts.py          wykresy, zrzut karty produktu i bloki liczb w README
+scripts/make_demo_svg.py        animacja na górze README (zrzuty aplikacji, jasna i ciemna ramka)
 scripts/browser.py              headless Chrome przez DevTools (wykresy i zrzuty)
 src/product_profitability/
   data.py                       wczytanie tabel i kontrakt kolumn kosztów
@@ -303,7 +308,7 @@ pip install -r requirements-dev.txt
 python -m pytest
 ```
 
-71 testów sprawdza ręcznie policzony sklep, rozliczenie kosztów, reguły ruchów, wczytywanie danych, wykresy
+74 testy sprawdzają ręcznie policzony sklep, rozliczenie kosztów, reguły ruchów, wczytywanie danych, wykresy
 i aplikację bez przeglądarki; trwają kilka sekund i nie potrzebują pobranych danych.
 
 ## Licencja
