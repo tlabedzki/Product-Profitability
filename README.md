@@ -12,8 +12,8 @@ kurier, zwroty, operator płatności i partnerzy wystawiają faktury na przesył
 Bestseller może więc przynosić stratę miesiącami i nikt tego nie zauważy.
 
 **Podejście.** Projekt rozkłada każdy koszt z faktur na produkty, liczy marżę krok po kroku od cennika do marży na
-czysto i przy każdym stratnym bestsellerze podaje powód oraz jeden ruch: zmianę ceny, koniec darmowej dostawy albo
-wycofanie.
+czysto, czyli tego, co zostaje po wszystkich kosztach sprzedaży, i przy każdym stratnym bestsellerze podaje powód
+oraz jeden ruch: zmianę ceny, koniec darmowej dostawy albo wycofanie.
 
 <!-- generated:result -->
 **Wynik.** Z 16,5 mln zł marży z cennika zostaje 10,1 mln zł, czyli 61%. Najwięcej zabierają zwroty (2,49 mln zł) i
@@ -65,7 +65,7 @@ Zamówienia oznaczone w danych jako oszustwa są poza marżą produktów. Rozlic
 
 **Pytanie.** Ile z marży z cennika zostaje po wszystkich kosztach sprzedaży i co zabiera najwięcej?
 
-**Co robi analiza.** Zapytanie SQL w DuckDB (baza danych w pamięci, która czyta pliki Parquet) rozkłada koszty
+**Co robi analiza.** Zapytanie SQL w DuckDB (baza danych w pamięci, która czyta tabele wprost z plików) rozkłada koszty
 zamówienia na jego linie: koszt przewoźnika według wielkości paczki każdego produktu, opłatę za płatność według
 wartości linii. Potem kaskada odejmuje od marży z cennika (cena netto minus koszt zakupu) kolejno rabaty, zwroty,
 wysyłkę, opłaty za płatność i prowizje. Zostaje marża na czysto.
@@ -120,8 +120,8 @@ Liczbę bestsellerów i limit podwyżki zmienia się suwakami w aplikacji; lista
 **Wynik.**
 
 <!-- generated:losses -->
-44 z 500 bestsellerów traci pieniądze, razem −73,0 tys. zł. Ruchy: zmiana ceny 34, koniec darmowej dostawy 0, wycofanie
-10. Dziesięć największych strat:
+44 z 500 bestsellerów traci pieniądze, razem −73,0 tys. zł. Ruchy: zmiana ceny 33, koniec darmowej dostawy 0, wycofanie
+11. Dziesięć największych strat:
 
 | # | Produkt | Kategoria | Sztuki | Marża na czysto | Główny koszt | Ruch |
 |---:|---|---|---:|---:|---|---|
@@ -153,7 +153,7 @@ zamówień z marżą na czysto każdej linii, czyli z jej częścią kosztów do
 ![Karta produktu Smartphone Xiaomi Redmi 12C: kaskada marży i lista zamówień](docs/img/app-card.png)
 
 Największa strata wśród bestsellerów: Smartphone Xiaomi Redmi 12C (fioletowy), −5 708 zł. Rabaty (średnio 34%) zabrały
-10 040 zł przy marży z cennika 4 862 zł. Ogranicz rabat do 15%, żeby wyjść na zero.
+10 040 zł przy marży z cennika 4 862 zł. Ogranicz rabat do 14%, żeby wyjść na zero.
 <!-- /generated:card -->
 
 **Co to znaczy dla właściciela.** Zanim zmieni cenę albo wycofa produkt, widzi zamówienia, które złożyły się na
@@ -186,7 +186,8 @@ zginął, a te punkty mówią, gdzie wynik zależy od danych i przyjętych regu�
 2. Przy produktach ze zwrotami ponad średnią kategorii poprawić opis i rozmiarówkę albo zmienić dostawcę.
 3. Przed wycofaniem bestsellera otworzyć jego kartę i sprawdzić, czy strata nie wynika z jednego zamówienia.
 
-**Ograniczenia.** Dane są syntetyczne, z jednego przebiegu generatora (ziarno 42). Stawki kosztów są fikcyjne;
+**Ograniczenia.** Dane są syntetyczne, z jednego przebiegu generatora (ziarno 42, czyli stały punkt startu
+losowania: każdy przebieg daje te same dane). Stawki kosztów są fikcyjne;
 w prawdziwym sklepie przyszłyby z umów z przewoźnikiem, operatorem płatności i siecią partnerską. Marketing poza
 prowizją (kampanie) nie wchodzi do marży produktu. Reguły ruchów (500 bestsellerów, podwyżka do 10%, połowa zamówień
 z darmową dostawą, zwroty dwa razy powyżej kategorii) to decyzje projektu, które aplikacja pozwala zmienić.
@@ -233,16 +234,16 @@ otwiera też adres `/?product=<id>`. Zatrzymanie: Ctrl+C.
 
 ## Dane
 
-Wszystko jest syntetyczne: Data-Generator v1.7.1 (licencja MIT) z ziarnem 42 tworzy sklep Lumo i jego koszty. Nazwy
-marek w nazwach produktów służą tylko realizmowi danych; sklep, zamówienia i koszty są fikcyjne. Projekt czyta pięć
-tabel:
+Wszystko jest syntetyczne: Data-Generator v1.7.1 (wydanie z 2026-11-24, licencja MIT) z ziarnem 42 tworzy sklep
+Lumo i jego koszty; `scripts/get_data.py` odtwarza dane z tego wydania. Nazwy marek w nazwach produktów służą tylko
+realizmowi danych; sklep, zamówienia i koszty są fikcyjne. Projekt czyta pięć tabel:
 
 ```mermaid
 erDiagram
     product_data ||--o{ order_data : "product_id"
-    order_data ||--o| shipment_data : "order_id"
+    order_data }|--o| shipment_data : "order_id"
     order_data ||--o| return_data : "order_line_id"
-    order_data ||--|| payment_data : "order_id"
+    order_data }|--|| payment_data : "order_id"
     product_data {
         int product_id PK
         float net_purchase_price
@@ -302,7 +303,7 @@ pip install -r requirements-dev.txt
 python -m pytest
 ```
 
-61 testów sprawdza ręcznie policzony sklep, rozliczenie kosztów, reguły ruchów, wczytywanie danych, wykresy
+71 testów sprawdza ręcznie policzony sklep, rozliczenie kosztów, reguły ruchów, wczytywanie danych, wykresy
 i aplikację bez przeglądarki; trwają kilka sekund i nie potrzebują pobranych danych.
 
 ## Licencja
