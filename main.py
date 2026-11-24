@@ -14,33 +14,40 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from product_profitability import data, diagnose, margin  # noqa: E402
+from product_profitability import data, diagnose, margin, report  # noqa: E402
 
 OUTPUT_DIR = ROOT / "output"
 
 
 def pln(value: float) -> str:
-    return f"{value:>14,.0f} PLN".replace("-", "−")
+    return f"{report.money(value):>18}"
+
+
+def positive(text: str) -> int:
+    value = int(text)
+    if value < 1:
+        raise argparse.ArgumentTypeError(f"must be at least 1, not {value}")
+    return value
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--data", type=Path, default=data.RAW_DIR, help="folder with the Data-Generator tables")
     parser.add_argument("--output", type=Path, default=OUTPUT_DIR, help="folder for the CSV files")
-    parser.add_argument("--bestsellers", type=int, default=diagnose.Rules.bestsellers,
+    parser.add_argument("--bestsellers", type=positive, default=diagnose.Rules.bestsellers,
                         help="how many products by net revenue count as bestsellers")
     args = parser.parse_args(argv)
 
     try:
         shop = data.load(args.data)
-    except FileNotFoundError as error:
+        lines = margin.line_costs(shop)
+    except (FileNotFoundError, ValueError) as error:  # no data, or data that breaks the cost contract
         print(error, file=sys.stderr)
         return 1
-    lines = margin.line_costs(shop)
-    report = margin.reconcile(shop, lines)
-    worst = report["difference"].abs().max()
+    costs = margin.reconcile(shop, lines)
+    worst = costs["difference"].abs().max()
     if worst >= 0.005:
-        print(report.to_string(index=False), file=sys.stderr)
+        print(costs.to_string(index=False), file=sys.stderr)
         print(f"Costs do not add up: {worst:.2f} PLN lost or doubled", file=sys.stderr)
         return 2
 

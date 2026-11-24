@@ -100,5 +100,10 @@ def category_kept(data: pd.DataFrame, language: str = "en", height: int | None =
     )
     fig.update_yaxes(autorange="reversed", showgrid=False, showline=False, ticks="", tickfont={"color": t.TEXT},
                      fixedrange=True, ticklabelstandoff=8)
-    fig.update_xaxes(visible=False, range=[0, 1.0], fixedrange=True)
+    # Usually 0 to 100%; a category that loses money gets room on the left, with a zero line.
+    low = min(0.0, float(data["kept"].min(skipna=True)) if data["kept"].notna().any() else 0.0)
+    high = max(1.0, float(data["kept"].max(skipna=True)) if data["kept"].notna().any() else 1.0)
+    if low < 0:
+        fig.add_shape(type="line", xref="x", yref="paper", x0=0, x1=0, y0=0, y1=1, line={"color": t.LINE, "width": 1})
+    fig.update_xaxes(visible=False, range=[low - (high - low) * (0.12 if low < 0 else 0), high], fixedrange=True)
     return _layout(fig, height or 30 * len(data) + 24, bargap=0.28, margin={"l": 8, "r": 48, "t": 8, "b": 8})

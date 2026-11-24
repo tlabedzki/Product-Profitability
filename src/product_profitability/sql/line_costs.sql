@@ -29,15 +29,19 @@ size_overall AS (
     FROM single_unit GROUP BY ALL
 ),
 weighted AS (
+    -- A size with no one-unit parcels (or a free one) falls back to the size overall, then to all parcels.
     SELECT l.*,
-           l.quantity * coalesce(m.size_weight, a.size_weight, 1.0) AS parcel_weight
+           l.quantity * coalesce(nullif(m.size_weight, 0), nullif(a.size_weight, 0),
+                                 nullif((SELECT median(carrier_cost) FROM single_unit), 0), 1.0) AS parcel_weight
     FROM lines AS l
     LEFT JOIN size_by_method AS m USING (delivery_method, parcel_size)
     LEFT JOIN size_overall AS a USING (parcel_size)
 ),
 shares AS (
     SELECT *,
-           parcel_weight / sum(parcel_weight) OVER (PARTITION BY order_id) AS shipping_share,
+           CASE WHEN sum(parcel_weight) OVER (PARTITION BY order_id) > 0
+                THEN parcel_weight / sum(parcel_weight) OVER (PARTITION BY order_id)
+                ELSE 1.0 / count(*) OVER (PARTITION BY order_id) END AS shipping_share,
            CASE WHEN sum(value_gross) OVER (PARTITION BY order_id) > 0
                 THEN value_gross / sum(value_gross) OVER (PARTITION BY order_id)
                 ELSE 1.0 / count(*) OVER (PARTITION BY order_id) END AS payment_share

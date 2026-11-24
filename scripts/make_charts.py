@@ -68,6 +68,11 @@ def blocks(numbers: dict) -> dict[str, str]:
     losing_all = int((products["true_margin"] < 0).sum())
     sources = len(numbers["reconcile"])
     worst_diff = float(numbers["reconcile"]["difference"].abs().max())
+    if worst_diff >= 0.005:
+        raise SystemExit(f"Costs do not add up ({worst_diff:.2f} PLN): the README would claim 'to the grosz'")
+    free = int(moves.get("free_shipping", 0))
+    if free:
+        raise SystemExit(f"'End free delivery' now fires {free} times: rewrite chapter 7 and the summary first")
     median_units = int(losing.loc[losing["category"] == top_category.index[0], "units"].median())
     free_share = float(products["free_delivery_lines"].sum() / products["shipped_lines"].sum())
     shipping_net = float(products["shipping"].sum())

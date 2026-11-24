@@ -151,3 +151,18 @@ def test_polish_loss_markdown(products):
     markdown = report.loss_markdown(report.loss_table(losing, "pl"), language="pl")
     assert markdown.splitlines()[0] == report.LOSS_HEADERS["pl"]
     assert "| Sofa Big (szary) | Meble | 2 | −39 zł | wysyłka | Bez darmowej dostawy |" in markdown
+
+
+def test_compact_rounds_before_it_picks_the_unit():
+    assert report.compact(999_960) == "1.00M"
+    assert report.compact(9_996) == "10.0k"
+    assert report.compact(999.6) == "1.00k"
+    assert report.compact(999_960, "pl") == "1,00 mln"
+
+
+def test_category_that_loses_money_is_drawn_left_of_zero():
+    data = pd.DataFrame({"label": ["A", "B"], "kept": [-0.2, 0.8], "biggest": ["returns", "discounts"],
+                         "highlight": [True, False]})
+    fig = figures.category_kept(data)
+    assert fig.layout.xaxis.range[0] < -0.2 and len(fig.layout.shapes) == 1
+    assert fig.data[0].text[0] == "−20%"

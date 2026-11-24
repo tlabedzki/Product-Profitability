@@ -41,8 +41,19 @@ def diagnosed(planted, **rules):
 def test_each_planted_case_gets_its_driver_and_move(planted):
     found = diagnosed(planted, bestsellers=8)
     expected = {1: ("discount", "price"), 2: ("shipping", "free_shipping"), 3: ("returns", "delist"),
-                4: ("price_list", "price"), 6: ("discount", "price"), 7: ("price_list", "delist")}
+                4: ("price_list", "price"), 6: ("discount", "delist"), 7: ("price_list", "delist")}
     assert {pid: (row.driver, row.move) for pid, row in found.iterrows()} == expected
+
+
+def test_a_wider_price_rise_limit_turns_delist_into_price(planted):
+    # Product 6 needs a 10.5% rise once the 10% discount is counted: delist at 10%, change the price at 11%.
+    assert diagnosed(planted, bestsellers=8).loc[6, "move"] == "delist"
+    assert diagnosed(planted, bestsellers=8, max_price_rise=0.11).loc[6, "move"] == "price"
+
+
+def test_bestsellers_must_be_positive(planted):
+    with pytest.raises(ValueError, match="at least 1"):
+        diagnose.bestsellers(planted, diagnose.Rules(bestsellers=0))
 
 
 def test_profitable_and_small_products_stay_off_the_list(planted):
@@ -55,7 +66,7 @@ def test_profitable_and_small_products_stay_off_the_list(planted):
 def test_reason_sentences_name_the_numbers(planted):
     found = diagnosed(planted, bestsellers=8)
     assert found.loc[1, "reason"] == ("Discounts (on average 60%) took 6,000 PLN against a price-list margin of "
-                                      "4,000 PLN. Cap the discount at 39% to break even.")
+                                      "4,000 PLN. Cap the discount at 38% to break even.")
     assert "90% of orders shipped free" in found.loc[2, "reason"]
     assert found.loc[3, "reason"].startswith("6 of 10 units came back (category: 7%), 2 written off")
     assert found.loc[4, "reason"].endswith("Raise the price by 9 PLN (7%) per unit to break even.")
@@ -65,13 +76,28 @@ def test_reason_sentences_name_the_numbers(planted):
 def test_no_zero_discount_cap(planted):
     row = diagnosed(planted, bestsellers=8).loc[6]
     assert row.break_even_discount_rate < 0.01
-    assert "Cap the discount" not in row.reason and "Raise the price" in row.reason
+    assert "Cap the discount" not in row.reason and "Delist it" in row.reason
+
+
+def variable_share(row) -> float:
+    return (row.payment + row.commission) / (row.list_revenue - row.discount)
 
 
 def test_break_even_rise_really_breaks_even(planted):
-    row = diagnosed(planted, bestsellers=8).loc[4]
-    kept = row.units - row.units_refunded
-    assert row.true_margin + row.break_even_rise / 1.23 * kept == pytest.approx(0.0)
+    # Every kept unit brings the rise without VAT, after its discount and the fees that grow with the price.
+    for product_id in (4, 6):
+        row = diagnosed(planted, bestsellers=8).loc[product_id]
+        kept = row.units - row.units_refunded
+        gain = row.break_even_rise / 1.23 * kept * (1 - row.discount_rate) * (1 - variable_share(row))
+        assert row.true_margin + gain == pytest.approx(0.0)
+
+
+def test_break_even_discount_really_breaks_even(planted):
+    # Product 1: 60% discount, 2,100 PLN loss, payment fees 2.5% of the discounted revenue.
+    row = diagnosed(planted, bestsellers=8).loc[1]
+    saved = (row.discount_rate - row.break_even_discount_rate) * row.list_revenue * (1 - variable_share(row))
+    assert row.true_margin + saved == pytest.approx(0.0)
+    assert row.break_even_discount_rate == pytest.approx(0.6 - 2100 / 9750)
 
 
 def test_biggest_loss_first(planted):
@@ -83,7 +109,7 @@ def test_polish_reasons_carry_the_same_facts(planted):
     found = diagnose.loss_making_bestsellers(planted, diagnose.Rules(bestsellers=8), language="pl").set_index(
         "product_id")
     assert found.loc[1, "reason"] == ("Rabaty (średnio 60%) zabrały 6 000 zł przy marży z cennika 4 000 zł. "
-                                      "Ogranicz rabat do 39%, żeby wyjść na zero.")
+                                      "Ogranicz rabat do 38%, żeby wyjść na zero.")
     assert found.loc[2, "reason"].endswith("Wyłącz go z darmowej dostawy albo dolicz opłatę za dostawę.")
     assert found.loc[3, "reason"].startswith("Wróciło 6 z 10 sztuk (kategoria: 7%), 2 do odpisu")
     assert found.loc[4, "reason"].endswith("Podnieś cenę o 9 zł (7%) na sztuce, żeby wyjść na zero.")

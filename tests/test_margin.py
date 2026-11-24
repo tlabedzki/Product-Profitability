@@ -81,3 +81,11 @@ def test_net_revenue_comes_from_gross_prices_not_the_net_columns(tiny_shop):
     before = margin.product_margins(tiny_shop)["true_margin"].sum()
     tiny_shop.truth = {"vat_rate": 0.08}
     assert margin.product_margins(tiny_shop)["true_margin"].sum() != pytest.approx(before)
+
+
+def test_free_parcels_do_not_break_the_split(tiny_shop):
+    # Every one-unit parcel free for the shop: the weights fall back, nothing turns into NaN, costs still add up.
+    tiny_shop.shipments = tiny_shop.shipments.assign(carrier_cost=[80.0, 0.0, 0.0, 0.0])
+    lines = margin.line_costs(tiny_shop)
+    assert lines[["carrier_cost", "delivery_fee"]].notna().all().all()
+    assert margin.reconcile(tiny_shop, lines)["difference"].abs().max() < 0.005

@@ -28,8 +28,9 @@ def compact(value: float, language: str = "en", unit: str = "") -> str:
     size = abs(value)
     suffixes = ((1e6, " mln"), (1e3, " tys.")) if language == "pl" else ((1e6, "M"), (1e3, "k"))
     for limit, suffix in suffixes:
-        if size >= limit:
-            number = f"{size / limit:.{2 if size < 10 * limit else 1}f}"
+        scaled = round(size / limit, 2)  # round first: 999,960 is 1.00M, not 1000.0k
+        if scaled >= 1:
+            number = f"{size / limit:.{2 if scaled < 10 else 1}f}"
             text = (number.replace(".", ",") if language == "pl" else number) + suffix
             break
     else:
@@ -38,6 +39,8 @@ def compact(value: float, language: str = "en", unit: str = "") -> str:
 
 
 def percent(value: float, decimals: int = 0, language: str = "en") -> str:
+    if pd.isna(value):
+        return "–"
     text = f"{value:.{decimals}%}".replace("-", "−")
     return text.replace(".", ",") if language == "pl" else text
 
@@ -123,14 +126,16 @@ def category_data(products: pd.DataFrame, language: str = "en") -> pd.DataFrame:
     """Share of the price-list margin each category keeps after selling costs, the lowest first (highlighted)."""
     language = i18n.check(language)
     summed = products.groupby("category")[["list_margin", *STEPS, "true_margin"]].sum()
+    # A category sold at or below the purchase cost has no share to keep (NaN) and goes first, as the worst.
+    kept = summed["true_margin"] / summed["list_margin"].where(summed["list_margin"] > 0)
     out = pd.DataFrame({
         "category": summed.index,
         "label": [i18n.category(name, language) for name in summed.index],
         "list_margin": summed["list_margin"].to_numpy(),
         "true_margin": summed["true_margin"].to_numpy(),
-        "kept": (summed["true_margin"] / summed["list_margin"]).to_numpy(),
+        "kept": kept.to_numpy(),
         "biggest": summed[list(STEPS)].idxmax(axis=1).map(i18n.STEP_LABELS[language]).str.lower().to_numpy(),
-    }).sort_values(["kept", "category"], ignore_index=True)
+    }).sort_values(["kept", "category"], ignore_index=True, na_position="first")
     out["highlight"] = out.index == 0
     return out
 

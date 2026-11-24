@@ -16,12 +16,10 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+from product_profitability import i18n
 from product_profitability.margin import STEPS, VAT_RATE
 
-DRIVER_LABELS = {
-    "price_list": "price below cost", "discount": "discounts", "returns": "returns", "shipping": "shipping",
-    "payment": "payment fees", "commission": "affiliate commission",
-}
+DRIVER_LABELS = i18n.DRIVER_LABELS["en"]
 
 
 @dataclass(frozen=True)
@@ -36,6 +34,8 @@ class Rules:
 
 def bestsellers(products: pd.DataFrame, rules: Rules = Rules()) -> pd.DataFrame:
     """The top products by net revenue, with their rank (1 = highest)."""
+    if rules.bestsellers < 1:
+        raise ValueError(f"bestsellers must be at least 1, not {rules.bestsellers}")
     top = products.sort_values(["net_revenue", "product_id"], ascending=[False, True]).head(rules.bestsellers)
     return top.assign(revenue_rank=np.arange(1, len(top) + 1)).reset_index(drop=True)
 
@@ -52,17 +52,26 @@ def add_diagnosis(products: pd.DataFrame, all_products: pd.DataFrame, rules: Rul
     steps = out[list(STEPS)]
     out["driver"] = np.where(out["list_margin"] <= 0, "price_list", steps.idxmax(axis=1))
     kept = out["units"] - out["units_refunded"]
+    revenue = out["list_revenue"].where(out["list_revenue"] > 0)
+    out["discount_rate"] = (out["discount"] / revenue).fillna(0.0)
+    # Payment fees and commission grow with the price: the share of the discounted revenue they take.
+    after_discount = (out["list_revenue"] - out["discount"]).where(lambda value: value > 0)
+    variable = ((out["payment"] + out["commission"]) / after_discount).fillna(0.0).clip(0, 0.9)
+    # A list-price rise of R gross per unit brings R / (1 + VAT) x (1 - discount) x (1 - variable) on every unit the
+    # customer kept (returned units are refunded at the new price too), so breaking even needs:
     unit_gross = out["list_revenue"] * (1 + rules.vat_rate) / out["units"].where(out["units"] > 0)
-    rise = -out["true_margin"] * (1 + rules.vat_rate) / kept.where(kept > 0)
+    rise = (-out["true_margin"] * (1 + rules.vat_rate)
+            / (kept.where(kept > 0) * (1 - out["discount_rate"]) * (1 - variable)))
     out["break_even_rise"] = rise.clip(lower=0)
     out["break_even_rise_rate"] = (out["break_even_rise"] / unit_gross).fillna(np.inf)
     out["free_delivery_share"] = (out["free_delivery_lines"] / out["shipped_lines"].where(out["shipped_lines"] > 0)
                                   ).fillna(0.0)
     out["category_return_rate"] = out["category"].map(category_return_rates(all_products)).fillna(0.0)
-    revenue = out["list_revenue"].where(out["list_revenue"] > 0)
-    out["discount_rate"] = (out["discount"] / revenue).fillna(0.0)
-    # The biggest average discount that still breaks even (the other costs kept as they are).
-    out["break_even_discount_rate"] = ((out["discount"] + out["true_margin"]) / revenue).fillna(0.0)
+    # The biggest average discount that still breaks even: a lower discount pays only on the kept units, less the
+    # payment fees and commission on the extra revenue.
+    kept_share = (kept / out["units"].where(out["units"] > 0)).fillna(0.0)
+    gain_per_point = revenue * kept_share * (1 - variable)
+    out["break_even_discount_rate"] = (out["discount_rate"] + out["true_margin"] / gain_per_point).fillna(0.0)
     out["move"] = [_move(row, rules) for row in out.itertuples(index=False)]
     write = (_reason, _action) if language == "en" else (_reason_pl, _action_pl)
     out["reason"] = [write[0](row) + " " + write[1](row, rules) for row in out.itertuples(index=False)]
@@ -130,8 +139,7 @@ def _zl(value: float) -> str:
     return f"{value:,.0f} zł".replace(",", " ").replace("-", "−")
 
 
-def _pct_pl(value: float) -> str:
-    return f"{value:.0%}"
+_pct_pl = _pct  # the same "34%" in both languages
 
 
 OTHER_DRIVERS_PL = {"payment": "Opłaty za płatność zabrały", "commission": "Prowizja afiliacyjna zabrała"}

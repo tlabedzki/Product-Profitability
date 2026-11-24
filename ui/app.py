@@ -50,16 +50,14 @@ ORDER_COLUMNS = [
 ]
 
 
-def pln(value: float) -> str:
-    return f"{value:,.0f} PLN".replace("-", "−")
+pln = report.money  # "5,708 PLN"
 
 
 def amount(value: float) -> str:
     return f"{value:,.0f}".replace("-", "−")
 
 
-def pct(value: float) -> str:
-    return "–" if pd.isna(value) else f"{value:.0%}".replace("-", "−")
+pct = report.percent  # "34%", "–" when there is no value
 
 
 # ---------------------------------------------------------------------------------------------------------------- #
@@ -73,12 +71,26 @@ def prepare():
     return shop, lines, margin.product_margins(shop, lines)
 
 
+def rules_for(bestsellers, rise) -> diagnose.Rules:
+    """The rules of the two sliders (the price rise in percent)."""
+    return diagnose.Rules(bestsellers=int(bestsellers), max_price_rise=float(rise) / 100)
+
+
 @lru_cache(maxsize=64)
 def losing_for(bestsellers: int, rise: int) -> pd.DataFrame:
     """Loss-making bestsellers for one setting of the two sliders (cached: callbacks share it)."""
     _, _, products = prepare()
-    rules = diagnose.Rules(bestsellers=int(bestsellers), max_price_rise=float(rise) / 100)
-    return diagnose.loss_making_bestsellers(products, rules)
+    return diagnose.loss_making_bestsellers(products, rules_for(bestsellers, rise))
+
+
+@cache
+def product_choices() -> tuple[list[dict[str, str]], frozenset[str], str]:
+    """Options of the product picker, their values and the default card (the biggest loss), computed once."""
+    _, _, products = prepare()
+    options = report.product_options(products, PRODUCT_OPTIONS)
+    losing = losing_for(RULES["bestsellers"][5], RULES["rise"][5])
+    first = losing["product_id"].iloc[0] if len(losing) else products.sort_values("net_revenue").iloc[-1].product_id
+    return options, frozenset(option["value"] for option in options), str(int(first))
 
 
 def rule_text(name: str, value: float) -> str:
@@ -86,14 +98,10 @@ def rule_text(name: str, value: float) -> str:
     return f"{prefix}{float(value):.{decimals}f}{suffix}"
 
 
-def start_product(products: pd.DataFrame, requested: str | None = None) -> str:
+def start_product(requested: str | None = None) -> str:
     """The product of the card when the page opens: ?product=… if it is on the list, else the biggest loss."""
-    options = {option["value"] for option in report.product_options(products, PRODUCT_OPTIONS)}
-    if requested in options:
-        return requested
-    losing = diagnose.loss_making_bestsellers(products)
-    first = losing["product_id"].iloc[0] if len(losing) else products.sort_values("net_revenue").iloc[-1].product_id
-    return str(int(first))
+    _, values, default = product_choices()
+    return requested if requested in values else default
 
 
 # ---------------------------------------------------------------------------------------------------------------- #
@@ -201,7 +209,10 @@ def loss_view(losing: pd.DataFrame) -> list:
     ]
 
 
-def card_view(shop, lines: pd.DataFrame, products: pd.DataFrame, product_id: int) -> list:
+def card_view(shop, lines: pd.DataFrame, products: pd.DataFrame, product_id: int,
+              rules: diagnose.Rules | None = None) -> list:
+    """The card of one product; its verdict uses the same rules as the loss table (the two sliders)."""
+    rules = rules or diagnose.Rules()
     row = products.set_index("product_id").loc[product_id]
     one = products[products["product_id"] == product_id]
     name = report.product_label(one.iloc[0])
@@ -212,7 +223,7 @@ def card_view(shop, lines: pd.DataFrame, products: pd.DataFrame, product_id: int
         stat("price-list margin, PLN", amount(row["list_margin"]), f"{pct(row['list_margin_rate'])} of the list price"),
         stat("price today, PLN", amount(row["sales_price_gross"]), f"{row['category']}, {row['parcel_size']} parcel"),
     ], className="dg-stats pp-stats-4")
-    diagnosis = diagnose.add_diagnosis(one, products)
+    diagnosis = diagnose.add_diagnosis(one, products, rules)
     if row["true_margin"] < 0:
         verdict = html.P([html.B("Loses money. "), diagnosis["reason"].iloc[0]], className="pp-verdict")
     else:
@@ -258,7 +269,7 @@ def _order_cell(column, css, record):
 def page():
     try:
         shop, _, products = prepare()
-    except FileNotFoundError as error:
+    except (FileNotFoundError, ValueError) as error:  # no data, or data that breaks the cost contract
         shop, products, problem = None, None, str(error)
     header = html.Header(html.Div([
         html.Span(["Product Profitability", html.Span(".", className="dg-dot")], className="dg-wordmark"),
@@ -273,8 +284,8 @@ def page():
                className="dg-lead"),
     ], className="dg-hero")
     if shop is None:
-        body = [hero, section(1, "Margin", "The shop data is missing.", html.P(problem, className="dg-placeholder"),
-                              "cascade")]
+        body = [hero, section(1, "Margin", "The shop data is missing or incomplete.",
+                              html.P(problem, className="dg-placeholder"), "cascade")]
     else:
         try:
             requested = flask.request.args.get("product")
@@ -297,8 +308,8 @@ def page():
                 html.Div(id="loss-table", className="pp-block"),
             ], "losses"),
             section(3, "Product card", "One product: its own cascade and every order line behind it.", [
-                dmc.Select(id="product", data=report.product_options(products, PRODUCT_OPTIONS),
-                           value=start_product(products, requested), label="Product (top 2,000 by net revenue)",
+                dmc.Select(id="product", data=product_choices()[0],
+                           value=start_product(requested), label="Product (top 2,000 by net revenue)",
                            searchable=True, allowDeselect=False, className="pp-product-select", size="md",
                            maxDropdownHeight=320),
                 html.Div(id="card", className="pp-block"),
@@ -363,12 +374,14 @@ def clicked_product(triggered_id, clicks) -> str | None:
     return str(triggered_id["index"])
 
 
-@app.callback(Output("card", "children"), Input("product", "value"))
-def update_card(product_id):
+@app.callback(Output("card", "children"), Input("product", "value"), *[Input(name, "value") for name in RULES])
+def update_card(product_id, bestsellers=None, rise=None):
+    """The product card, judged by the same slider rules as the loss table."""
     if not product_id:
         return no_update
     shop, lines, products = prepare()
-    return card_view(shop, lines, products, int(product_id))
+    rules = rules_for(bestsellers, rise) if None not in (bestsellers, rise) else diagnose.Rules()
+    return card_view(shop, lines, products, int(product_id), rules)
 
 
 app.clientside_callback(

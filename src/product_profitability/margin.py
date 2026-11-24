@@ -19,14 +19,12 @@ from importlib import resources
 import duckdb
 import pandas as pd
 
+from product_profitability import i18n
 from product_profitability.data import ShopData
+from product_profitability.mock_costs import VAT_RATE
 
-VAT_RATE = 0.23
 STEPS = ("discount", "returns", "shipping", "payment", "commission")
-STEP_LABELS = {
-    "list_margin": "Price-list margin", "discount": "Discounts", "returns": "Returns", "shipping": "Shipping",
-    "payment": "Payment fees", "commission": "Affiliate commission", "true_margin": "True margin",
-}
+STEP_LABELS = i18n.STEP_LABELS["en"]
 LINE_SUMS = ("units", "units_refunded", "units_written_off", "list_revenue", "discount", "purchase_cost", "refund",
              "restocked_cost", "write_off_cost", "return_shipping_cost", "return_handling_cost", "carrier_cost",
              "delivery_fee", "payment_fee", "commission", "shipped_lines", "free_delivery_lines")

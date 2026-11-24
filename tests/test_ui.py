@@ -14,9 +14,11 @@ def shop_app(tiny_shop):
     original = ui_app.prepare
     ui_app.prepare = cache(lambda: prepared)
     ui_app.losing_for.cache_clear()
+    ui_app.product_choices.cache_clear()
     yield ui_app, prepared
     ui_app.prepare = original
     ui_app.losing_for.cache_clear()
+    ui_app.product_choices.cache_clear()
 
 
 def walk(component):
@@ -106,6 +108,31 @@ def test_product_card_shows_the_loss_and_every_order(shop_app):
 
 def test_start_product_from_the_address(shop_app):
     app, (_, _, products) = shop_app
-    assert app.start_product(products, "1") == "1"
-    assert app.start_product(products, "999") == "2"  # unknown: the biggest loss
-    assert app.start_product(products, None) == "2"
+    assert app.start_product("1") == "1"
+    assert app.start_product("999") == "2"  # unknown: the biggest loss
+    assert app.start_product(None) == "2"
+    assert [option["value"] for option in app.product_choices()[0]] == ["2", "1"]
+
+
+def test_card_follows_the_slider_rules(shop_app, monkeypatch):
+    # The card's verdict is judged with the rules of the sliders, the same as the loss table.
+    app, _ = shop_app
+    seen = []
+    original = app.diagnose.add_diagnosis
+
+    def spy(products, all_products, rules=None, language="en"):
+        seen.append(rules)
+        return original(products, all_products, rules, language)
+
+    monkeypatch.setattr(app.diagnose, "add_diagnosis", spy)
+    card = text_of(app.update_card("2", 300, 25))
+    assert seen[-1] == app.diagnose.Rules(bestsellers=300, max_price_rise=0.25)
+    assert app.losing_for(2, 25).set_index("product_id").loc[2, "reason"] in card
+
+
+def test_page_with_broken_cost_data_shows_the_reason(monkeypatch):
+    def broken():
+        raise ValueError("The data has only some of the shop cost columns; missing: return_data.handling_cost")
+
+    monkeypatch.setattr(ui_app, "prepare", broken)
+    assert "missing: return_data.handling_cost" in text_of(ui_app.page())
