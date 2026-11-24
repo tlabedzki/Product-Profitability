@@ -3,223 +3,228 @@
 [![Tests](https://github.com/tlabedzki/Product-Profitability/actions/workflows/tests.yml/badge.svg)](https://github.com/tlabedzki/Product-Profitability/actions/workflows/tests.yml)
 ![Python 3.11](https://img.shields.io/badge/python-3.11-3776AB)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
+[![Release](https://img.shields.io/github/v/release/tlabedzki/Product-Profitability)](https://github.com/tlabedzki/Product-Profitability/releases)
 
-Studium przypadku i aplikacja: ile naprawdę zarabia każdy produkt fikcyjnego sklepu internetowego po rabatach,
-zwrotach, wysyłce, opłatach za płatność i prowizjach.
+A case study and an app: what each product of a fictional online shop really earns after discounts, returns,
+shipping, payment fees and commissions.
 
-**Problem.** Właściciel sklepu widzi w cenniku marżę: cenę minus koszt zakupu. Nie widzi, ile z niej zostaje, bo
-kurier, zwroty, operator płatności i partnerzy wystawiają faktury na przesyłkę albo zamówienie, a nie na produkt.
-Bestseller może więc przynosić stratę miesiącami i nikt tego nie zauważy.
+**Problem.** A shop owner sees the margin in the price list: the price minus the purchase cost. They cannot see how
+much of it is left, because carriers, returns, payment operators and partners invoice per parcel or per order, not
+per product. A bestseller can lose money for months and nobody notices.
 
-**Podejście.** Projekt rozkłada każdy koszt z faktur na produkty, liczy marżę krok po kroku od cennika do marży na
-czysto, czyli tego, co zostaje po wszystkich kosztach sprzedaży, i przy każdym stratnym bestsellerze podaje powód
-oraz jeden ruch: zmianę ceny, koniec darmowej dostawy albo wycofanie.
+**Approach.** The project spreads every invoiced cost over the products, follows each product's margin step by step
+from the price list to the true margin, which is what is left after every selling cost, and gives every
+loss-making bestseller a reason and one move: change the price, end free delivery or delist it.
 
 <!-- generated:result -->
-**Wynik.** Z 16,5 mln zł marży z cennika zostaje 10,1 mln zł, czyli 61%. Najwięcej zabierają zwroty (2,49 mln zł) i
-rabaty (2,47 mln zł). 44 z 500 bestsellerów traci pieniądze, razem 73,0 tys. zł.
+**Result.** Of 16.5M PLN of price-list margin, 10.1M PLN is left, or 61%. Returns (2.49M PLN) and discounts (2.47M PLN)
+take the most. 44 of the top 500 bestsellers lose money, 73.0k PLN together.
 <!-- /generated:result -->
 
 <!-- generated:hero -->
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/img/app-demo-dark.svg">
-  <img alt="Aplikacja Product Profitability w ilustracji: suwak bestsellerów przesuwa się z top 500 na top 200, liczba stratnych bestsellerów zmienia się z 44 na 20, a strata razem z −73.0k na −34.0k PLN; kliknięcie produktu Laptop Lenovo IdeaPad Slim 5 (gray) w tabeli otwiera jego kartę z kaskadą marży i listą zamówień." src="docs/img/app-demo.svg">
+  <img alt="Product Profitability app, illustrated: the bestseller slider moves from the top 500 to the top 200, loss-making bestsellers go from 44 to 20 and the loss together from −73.0k to −34.0k PLN; a click on Laptop Lenovo IdeaPad Slim 5 (gray) in the table opens its product card with its margin cascade and order list." src="docs/img/app-demo.svg">
 </picture>
 <!-- /generated:hero -->
 
 **Stack:** Python · SQL · DuckDB · pandas · Plotly · Dash · pytest
 
 <!-- generated:summary -->
-- **Trafione:** każdy z 8 kosztów rozkłada się na produkty co do grosza (największa różnica 0,00 zł). Na minusie jest
-  2 167 z 22 714 sprzedanych produktów, ale tylko 44 z nich to bestsellery, więc lista do decyzji jest krótka.
-- **Chybione:** ruch „bez darmowej dostawy” nie pada ani razu (0 z 44). 38 z 44 stratnych bestsellerów to elektronika
-  sprzedawana w kilku sztukach (mediana 5), więc jeden zwrot zmienia wynik.
+- **What worked:** each of the 8 costs is spread over products to the grosz (largest difference 0.00 PLN). 2,167 of
+  22,714 products sold lose money, but only 44 of them are bestsellers, so the list to act on is short.
+- **What missed:** the move "end free delivery" never fires (0 of 44). 38 of the 44 loss-making bestsellers are
+  electronics sold in a few units (median 5), so one return changes the result.
 <!-- /generated:summary -->
 
-## 1. Sklep i pytanie właściciela
+## 1. The shop and the owner's question
 
-Lumo to fikcyjny polski sklep internetowy z danymi z [Data-Generatora](https://github.com/tlabedzki/Data-Generator):
-dwa lata zamówień, zwrotów, przesyłek i płatności. Właściciel zna marżę z cennika i chce wiedzieć trzy rzeczy:
+Lumo is a fictional Polish online shop with data from [Data-Generator](https://github.com/tlabedzki/Data-Generator):
+two years of orders, returns, parcels and payments. The owner knows the price-list margin and wants to know three
+things:
 
-- ile tej marży zostaje po wszystkich kosztach sprzedaży i który koszt zabiera najwięcej (rozdział 3);
-- które kategorie zarabiają najmniej (rozdział 4);
-- które z najlepiej sprzedających się produktów tracą pieniądze, dlaczego i co z nimi zrobić (rozdziały 5 i 6).
+- how much of that margin is left after every selling cost, and which cost takes the most (chapter 3);
+- which categories earn the least (chapter 4);
+- which of the best-selling products lose money, why, and what to do about them (chapters 5 and 6).
 
-## 2. Skąd wiadomo, co jest prawdą
+## 2. How we know the truth
 
-Dane są fikcyjne, ale koszty są naliczane jak w prawdziwym sklepie, tam gdzie wystawia je dostawca. Przewoźnik
-liczy za przesyłkę, operator płatności za zamówienie, a sieć partnerska za linię zamówienia. Sieć partnerska to
-strony, które polecają sklep i biorą procent od sprzedaży, czyli prowizję afiliacyjną. Zwrot kosztuje etykietę,
-obsługę i czasem odpis, czyli towar, którego nie da się już sprzedać. Stawki tych kosztów leżą w ustawieniach
-generatora, więc wiadomo, skąd wzięła się każda kwota.
+The data is fictional, but the costs arrive the way they do in a real shop, where the supplier invoices them. The
+carrier charges per parcel, the payment operator per order and the affiliate network per order line. An affiliate
+network is a group of sites that recommend the shop and take a share of the sale, the affiliate commission. A return
+costs a label, handling and sometimes a write-off, that is goods that can no longer be sold. The rates of these costs
+sit in the generator's settings, so every amount can be traced to where it came from.
 
-Wynik da się sprawdzić na trzy sposoby:
+The result can be checked in three ways:
 
-- **Rozliczenie co do grosza.** Suma każdego kosztu w tabelach równa się sumie tego kosztu rozpisanego na produkty.
-  `python main.py` kończy się błędem, gdy różnica przekroczy pół grosza.
-- **Sklep policzony ręcznie.** Testy mają mały sklep z pięciu zamówień, w którym każdą marżę policzono na kartce.
-  Kod musi dać te same kwoty.
-- **Netto z VAT, nie z kolumn.** Przychód netto to cena brutto po rabacie podzielona przez 1,23 (VAT 23%). Test
-  pilnuje, że model nie czyta kolumn netto z danych.
+- **Reconciled to the grosz.** The total of every cost in the tables equals the total of that cost spread over
+  products (a grosz is one hundredth of a zloty). `python main.py` stops with an error when they differ by more
+  than half a grosz.
+- **A shop worked out by hand.** The tests hold a small shop of five orders whose margins were worked out on paper.
+  The code has to return the same amounts.
+- **Net from VAT, not from columns.** Net revenue is the gross price after discount divided by 1.23 (23% VAT). A test
+  makes sure the model never reads the net columns of the data.
 
-Zamówienia oznaczone w danych jako oszustwa są poza marżą produktów. Rozliczenie pokazuje ich koszty osobno.
+Orders labelled as fraud in the data are left out of the product margins. The reconciliation shows their costs
+separately.
 
-## 3. Ile marży zostaje po kosztach sprzedaży?
+## 3. How much margin is left after selling costs?
 
-**Pytanie.** Ile z marży z cennika zostaje po wszystkich kosztach sprzedaży i co zabiera najwięcej?
+**Question.** How much of the price-list margin is left after every selling cost, and what takes the most?
 
-**Co robi analiza.** Zapytanie SQL w DuckDB (baza danych w pamięci, która czyta tabele wprost z plików) rozkłada koszty
-zamówienia na jego linie: koszt przewoźnika według wielkości paczki każdego produktu, opłatę za płatność według
-wartości linii. Potem kaskada odejmuje od marży z cennika (cena netto minus koszt zakupu) kolejno rabaty, zwroty,
-wysyłkę, opłaty za płatność i prowizje. Zostaje marża na czysto.
+**What we did.** A SQL query in DuckDB (an in-memory database that reads tables straight from files) spreads the
+costs of an order over its lines: the carrier cost by the parcel size of each product, the payment fee by the line
+value. The cascade then takes away from the price-list margin (net price minus purchase cost) the discounts, returns,
+shipping, payment fees and commission, one by one. What is left is the true margin.
 
-**Jak to sprawdzamy.** Rozliczenie z rozdziału 2: suma kroków kaskady równa się sumie kosztów w tabelach.
+**How we check it.** The reconciliation from chapter 2: the steps of the cascade add up to the costs in the tables.
 
-**Wynik.**
+**Result.**
 
 <!-- generated:cascade -->
-![Lumo zatrzymuje 61% marży z cennika: koszty sprzedaży zabierają 39%, najwięcej zwroty](docs/img/margin-cascade.png)
+![Lumo keeps 61% of its price-list margin: selling costs take 39%, returns the most](docs/img/margin-cascade.png)
 
-Rabaty i zwroty to razem 30% marży z cennika. Wysyłka netto, czyli koszt przewoźnika minus to, co zapłacili klienci, to
-tylko 435,1 tys. zł, choć 78% wysłanych linii jechało z darmową dostawą.
+Discounts and returns together take 30% of the price-list margin. Net shipping, the carrier cost minus what customers
+paid, is only 435.1k PLN, although 78% of shipped lines went with free delivery.
 <!-- /generated:cascade -->
 
-**Co to znaczy dla właściciela.** Najwięcej pieniędzy ucieka przez rabaty i zwroty, kurier kosztuje dużo mniej.
-Tam warto szukać oszczędności najpierw: w zasadach rabatów i w tym, co powoduje zwroty.
+**What it means for the owner.** Most of the money leaks through discounts and returns; the carrier costs far less.
+That is where to look for savings first: in the discount rules and in what causes returns.
 
-## 4. Które kategorie zarabiają najmniej?
+## 4. Which categories earn the least?
 
-**Pytanie.** Czy koszty sprzedaży rozkładają się równo, czy któraś kategoria traci dużo więcej?
+**Question.** Do selling costs fall evenly, or does one category lose much more?
 
-**Co robi analiza.** Ta sama kaskada dla każdej kategorii osobno: jaki udział marży z cennika zostaje po kosztach
-i który koszt zabiera najwięcej.
+**What we did.** The same cascade for each category: what share of the price-list margin is left after the costs,
+and which cost takes the most.
 
-**Wynik.**
+**Result.**
 
 <!-- generated:categories -->
-![Elektronika zatrzymuje najmniej marży z cennika: 47%, najwięcej zabierają rabaty](docs/img/category-margin.png)
+![Electronics keeps the least of its price-list margin: 47%, discounts take the most](docs/img/category-margin.png)
 
-Rozpiętość między kategoriami jest duża: Elektronika zatrzymuje 47%, Zdrowie 84%.
+The spread between categories is wide: Electronics keeps 47%, Health 84%.
 <!-- /generated:categories -->
 
-**Co to znaczy dla właściciela.** Kategoria z wysoką marżą w cenniku nie musi być najlepsza. Odzież ma dużą marżę,
-ale zwroty zabierają z niej sporo, a elektronika zaczyna od cienkiej marży, którą rabaty łatwo zjadają.
+**What it means for the owner.** A category with a high margin in the price list is not necessarily the best one.
+Clothing has a wide margin, but returns take a lot of it, while electronics starts from a thin margin that discounts
+eat easily.
 
-## 5. Które bestsellery tracą pieniądze i co z nimi zrobić?
+## 5. Which bestsellers lose money, and what to do about them?
 
-**Pytanie.** Które z najlepiej sprzedających się produktów przynoszą stratę i jaki jeden ruch ją zatrzyma?
+**Question.** Which of the best-selling products lose money, and which single move would stop the loss?
 
-**Co robi analiza.** Bestseller to jeden z 500 produktów z najwyższym przychodem netto. Przy każdym stratnym
-bestsellerze kod wskazuje koszt, który zabrał najwięcej, i dobiera ruch według reguł:
+**What we did.** A bestseller is one of the 500 products with the highest net revenue. For each loss-making
+bestseller the code names the cost that took the most and picks a move by these rules:
 
-- **Zmień cenę:** ogranicz rabat do poziomu, przy którym produkt wychodzi na zero, albo podnieś cenę, jeśli
-  wystarczy podwyżka do 10%.
-- **Bez darmowej dostawy:** gdy najwięcej zabiera wysyłka, a co najmniej połowa zamówień jechała za darmo.
-- **Wycofaj:** gdy zwrotów jest co najmniej dwa razy więcej niż w kategorii albo do wyjścia na zero trzeba podwyżki
-  powyżej 10%.
+- **Change the price:** cap the discount where the product breaks even, or raise the price if a rise of up to 10% is
+  enough.
+- **End free delivery:** when shipping takes the most and at least half of the orders shipped free.
+- **Delist:** when returns are at least twice the category's rate, or breaking even needs a price rise above 10%.
 
-Liczbę bestsellerów i limit podwyżki zmienia się suwakami w aplikacji; lista przelicza się od razu.
+Sliders in the app change the number of bestsellers and the price-rise limit; the list updates at once.
 
-**Wynik.**
+**Result.**
 
 <!-- generated:losses -->
-44 z 500 bestsellerów traci pieniądze, razem −73,0 tys. zł. Ruchy: zmiana ceny 33, koniec darmowej dostawy 0, wycofanie
-11. Dziesięć największych strat:
+44 of the top 500 bestsellers lose money, −73.0k PLN together. Moves: change the price 33, end free delivery 0, delist
+11. The ten biggest losses:
 
-| # | Produkt | Kategoria | Sztuki | Marża na czysto | Główny koszt | Ruch |
+| # | Product | Category | Units | True margin | Main cost | Move |
 |---:|---|---|---:|---:|---|---|
-| 99 | Smartphone Xiaomi Redmi 12C (fioletowy) | Elektronika | 7 | −5 708 zł | rabaty | Zmień cenę |
-| 374 | Smartphone Samsung Galaxy S24 (wielokolorowy) | Elektronika | 4 | −4 976 zł | rabaty | Zmień cenę |
-| 81 | Laptop Lenovo IdeaPad Slim 5 (szary) | Elektronika | 5 | −4 950 zł | rabaty | Zmień cenę |
-| 258 | Laptop Lenovo IdeaPad Slim 5 (granatowy) | Elektronika | 4 | −4 606 zł | rabaty | Zmień cenę |
-| 166 | Smartphone Apple iPhone 15 Pro (beżowy) | Elektronika | 7 | −4 147 zł | cena poniżej kosztu | Wycofaj |
-| 269 | Laptop Lenovo IdeaPad Slim 5 (niebieski) | Elektronika | 5 | −3 882 zł | rabaty | Wycofaj |
-| 237 | Laptop Asus ZenBook 14 (zielony) | Elektronika | 4 | −3 633 zł | rabaty | Zmień cenę |
-| 368 | Laptop Lenovo IdeaPad Slim 5 (biały) | Elektronika | 3 | −3 501 zł | zwroty | Wycofaj |
-| 70 | Smartphone Xiaomi Redmi Note 12 (beżowy) | Elektronika | 6 | −3 209 zł | rabaty | Zmień cenę |
-| 17 | Smartphone Sony Xperia 10 V (czarny) | Elektronika | 10 | −3 054 zł | cena poniżej kosztu | Zmień cenę |
+| 99 | Smartphone Xiaomi Redmi 12C (purple) | Electronics | 7 | −5,708 PLN | discounts | Change the price |
+| 374 | Smartphone Samsung Galaxy S24 (multicolor) | Electronics | 4 | −4,976 PLN | discounts | Change the price |
+| 81 | Laptop Lenovo IdeaPad Slim 5 (gray) | Electronics | 5 | −4,950 PLN | discounts | Change the price |
+| 258 | Laptop Lenovo IdeaPad Slim 5 (navy) | Electronics | 4 | −4,606 PLN | discounts | Change the price |
+| 166 | Smartphone Apple iPhone 15 Pro (beige) | Electronics | 7 | −4,147 PLN | price below cost | Delist |
+| 269 | Laptop Lenovo IdeaPad Slim 5 (blue) | Electronics | 5 | −3,882 PLN | discounts | Delist |
+| 237 | Laptop Asus ZenBook 14 (green) | Electronics | 4 | −3,633 PLN | discounts | Change the price |
+| 368 | Laptop Lenovo IdeaPad Slim 5 (white) | Electronics | 3 | −3,501 PLN | returns | Delist |
+| 70 | Smartphone Xiaomi Redmi Note 12 (beige) | Electronics | 6 | −3,209 PLN | discounts | Change the price |
+| 17 | Smartphone Sony Xperia 10 V (black) | Electronics | 10 | −3,054 PLN | price below cost | Change the price |
 <!-- /generated:losses -->
 
-**Co to znaczy dla właściciela.** Lista do decyzji jest krótka i każda pozycja ma gotowy ruch. Przy większości
-produktów wystarczy mniejszy rabat albo wyższa cena; wycofanie dotyczy mniejszej części listy.
+**What it means for the owner.** The list to act on is short and every line has a move ready. For most products a
+smaller discount or a higher price is enough; delisting is for a smaller part of the list.
 
-## 6. Karta produktu: co stoi za stratą?
+## 6. Product card: what is behind a loss?
 
-**Pytanie.** Skąd wzięła się strata konkretnego produktu?
+**Question.** Where did the loss of one particular product come from?
 
-**Co robi analiza.** Kliknięcie produktu w tabeli otwiera jego kartę: własną kaskadę marży i listę wszystkich
-zamówień z marżą na czysto każdej linii, czyli z jej częścią kosztów dostawy i płatności.
+**What we did.** A click on a product in the table opens its card: its own margin cascade and every order line with
+its true margin, that is with its share of the delivery and payment costs.
 
-**Wynik.**
+**Result.**
 
 <!-- generated:card -->
-![Karta produktu Smartphone Xiaomi Redmi 12C: kaskada marży i lista zamówień](docs/img/app-card.png)
+![Product card of Smartphone Xiaomi Redmi 12C: margin cascade and order list](docs/img/app-card.png)
 
-Największa strata wśród bestsellerów: Smartphone Xiaomi Redmi 12C (fioletowy), −5 708 zł. Rabaty (średnio 34%) zabrały
-10 040 zł przy marży z cennika 4 862 zł. Ogranicz rabat do 14%, żeby wyjść na zero.
+The biggest loss among bestsellers: Smartphone Xiaomi Redmi 12C (purple), −5,708 PLN. Discounts (on average 34%) took
+10,040 PLN against a price-list margin of 4,862 PLN. Cap the discount at 14% to break even.
 <!-- /generated:card -->
 
-**Co to znaczy dla właściciela.** Zanim zmieni cenę albo wycofa produkt, widzi zamówienia, które złożyły się na
-stratę, i może sprawdzić, czy to stały problem, czy jedno nietypowe zamówienie.
+**What it means for the owner.** Before changing the price or delisting a product, the owner sees the orders behind
+the loss and can tell a lasting problem from one unusual order.
 
-## 7. Co nie zadziałało i czego to uczy
+## 7. What did not work, and what it teaches
 
-- **Ruch „bez darmowej dostawy” nie pada ani razu.** Bestseller według przychodu to zwykle drogi produkt, a przy
-  drogim produkcie paczka kosztuje ułamek ceny, więc wysyłka nigdy nie jest jego głównym kosztem. Lekcja: reguła
-  działa w testach, ale te dane jej nie uruchamiają. Przy bestsellerach liczonych w sztukach, czyli tanich
-  i gabarytowych, mogłaby się pojawić.
-- **Bestsellery sprzedane w kilku sztukach.** Sklep ma bardzo szeroki katalog, więc nawet produkt z czołowej
-  pięćsetki sprzedaje się w kilku sztukach i jeden odpisany telefon decyduje o wyniku. Lekcja: przed wycofaniem
-  trzeba sprawdzić kartę produktu, a w prawdziwym sklepie liczyć dłuższy okres albo dodać próg minimalnej liczby
-  sztuk.
-- **Rabaty w elektronice to ustawienie generatora.** Wniosek o rabatach powyżej marży jest prawdziwy dla tych danych,
-  ale wynika z tego, jak generator rozdaje rabaty. W prawdziwym sklepie ta sama kaskada odpowie na to samo pytanie
-  na jego danych.
-- **Podział kosztów zamówienia to założenie.** Inny klucz podziału (na przykład po równo na linie) przesunie koszty
-  między produktami, ale nie zmieni sumy; rozliczenie co do grosza pilnuje tylko sumy.
+- **The move "end free delivery" never fires.** A bestseller by revenue is usually an expensive product, and for an
+  expensive product the parcel costs a fraction of the price, so shipping is never its main cost. Lesson: the rule
+  works in the tests, but this data does not trigger it. Bestsellers counted in units, which are cheap and bulky,
+  could trigger it.
+- **Bestsellers sold in a few units.** The shop has a very wide catalogue, so even a top-500 product sells only a few
+  units, and one written-off phone decides the result. Lesson: check the product card before delisting; in a real
+  shop use a longer period or a minimum number of units.
+- **The discounts in electronics are a generator setting.** The finding that discounts exceed the margin holds for
+  this data, but it comes from how the generator hands out discounts. In a real shop the same cascade answers the
+  same question on that shop's data.
+- **Splitting order costs is an assumption.** Another split (for example equally over the lines) would move costs
+  between products without changing the total; the reconciliation only guards the total.
 
-Te pomyłki są opisane wprost, bo pokazują granice narzędzia. Rozliczenie co do grosza mówi, że żaden koszt nie
-zginął, a te punkty mówią, gdzie wynik zależy od danych i przyjętych reguł.
+These misses are stated openly because they show the limits of the tool. The reconciliation says that no cost went
+missing; these points say where the result depends on the data and on the rules chosen.
 
-## 8. Wnioski i ograniczenia
+## 8. Takeaways and limitations
 
-**Rekomendacje.**
+**Recommendations.**
 
-1. Zacząć od rabatów: ograniczyć je przy produktach z cienką marżą do poziomu, przy którym wychodzą na zero.
-2. Przy produktach ze zwrotami ponad średnią kategorii poprawić opis i rozmiarówkę albo zmienić dostawcę.
-3. Przed wycofaniem bestsellera otworzyć jego kartę i sprawdzić, czy strata nie wynika z jednego zamówienia.
+1. Start with discounts: cap them on thin-margin products where the product still breaks even.
+2. For products returned more often than their category, improve the description and the size guide, or change the
+   supplier.
+3. Before delisting a bestseller, open its card and check that the loss does not come from a single order.
 
-**Ograniczenia.** Dane są syntetyczne, z jednego przebiegu generatora (ziarno 42, czyli stały punkt startu
-losowania: każdy przebieg daje te same dane). Stawki kosztów są fikcyjne;
-w prawdziwym sklepie przyszłyby z umów z przewoźnikiem, operatorem płatności i siecią partnerską. Marketing poza
-prowizją (kampanie) nie wchodzi do marży produktu. Reguły ruchów (500 bestsellerów, podwyżka do 10%, połowa zamówień
-z darmową dostawą, zwroty dwa razy powyżej kategorii) to decyzje projektu, które aplikacja pozwala zmienić.
+**Limitations.** The data is synthetic, from one run of the generator (seed 42, a fixed starting point for the
+random draws, so every run gives the same data). The cost rates are fictional; in a real shop they would come from
+the contracts with the carrier, the payment operator and the affiliate network. Marketing beyond the commission
+(campaigns) is not part of the product margin. The rules of the moves (500 bestsellers, a price rise of up to 10%,
+half the orders with free delivery, returns twice the category's rate) are choices of the project, and the app lets
+you change them.
 
-## Szybki start
+## Quickstart
 
-Potrzebny jest Git i Python 3.11. Sklonuj repozytorium:
+You need Git and Python 3.11. Clone the repository:
 
 ```bash
 git clone https://github.com/tlabedzki/Product-Profitability.git
 cd Product-Profitability
 ```
 
-<details><summary>Utwórz i włącz środowisko wirtualne z Pythonem 3.11 (Windows, macOS i Linux)</summary>
+<details><summary>Create and activate a virtual environment with Python 3.11 (Windows, macOS and Linux)</summary>
 
-Podanie wersji wybiera Pythona 3.11, nawet jeśli domyślny jest inny.
+Naming the version picks Python 3.11 even if another one is the default.
 
-| Krok | Windows (PowerShell) | macOS i Linux |
+| Step | Windows (PowerShell) | macOS and Linux |
 |---|---|---|
-| Utworzenie | `py -3.11 -m venv .venv` | `python3.11 -m venv .venv` |
-| Włączenie | `.venv\Scripts\Activate.ps1` | `source .venv/bin/activate` |
-| Sprawdzenie | `python --version` pokazuje `Python 3.11.x` | `python --version` pokazuje `Python 3.11.x` |
+| Create | `py -3.11 -m venv .venv` | `python3.11 -m venv .venv` |
+| Activate | `.venv\Scripts\Activate.ps1` | `source .venv/bin/activate` |
+| Check | `python --version` prints `Python 3.11.x` | `python --version` prints `Python 3.11.x` |
 
-Jeśli PowerShell mówi, że uruchamianie skryptów jest wyłączone, uruchom raz
-`Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` i włącz środowisko jeszcze raz.
+If PowerShell says that running scripts is disabled, run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once
+and activate again.
 
 </details>
 
-Potem zainstaluj pakiety, pobierz dane i policz marże:
+Then install the packages, get the data and work out the margins:
 
 ```bash
 pip install -r requirements.txt
@@ -227,20 +232,20 @@ python scripts/get_data.py
 python main.py
 ```
 
-`get_data.py` klonuje Data-Generator v1.7.1 i generuje dane sklepu w kilkanaście sekund. `main.py` wypisuje kaskadę
-sklepu i stratne bestsellery oraz zapisuje `output/product_margins.csv` i `output/loss_making_bestsellers.csv`.
+`get_data.py` clones Data-Generator v1.7.1 and generates the shop data in about 15 seconds. `main.py` prints the
+shop's cascade and the loss-making bestsellers and saves `output/product_margins.csv` and
+`output/loss_making_bestsellers.csv`.
 
-### Aplikacja
+### App
 
-`python -m ui.app` uruchamia aplikację pod adresem http://127.0.0.1:8050 (tylko na tym komputerze). Suwaki i kartę
-produktu ustawia też adres, więc widok można zapisać jako link: `/?bestsellers=200&rise=15&product=<id>`.
-Zatrzymanie: Ctrl+C.
+`python -m ui.app` starts the app at http://127.0.0.1:8050 (on this computer only). The address also sets the sliders
+and the product card, so a view can be kept as a link: `/?bestsellers=200&rise=15&product=<id>`. Stop it with Ctrl+C.
 
-## Dane
+## Data
 
-Wszystko jest syntetyczne: Data-Generator v1.7.1 (wydanie z 2026-11-24, licencja MIT) z ziarnem 42 tworzy sklep
-Lumo i jego koszty; `scripts/get_data.py` odtwarza dane z tego wydania. Nazwy marek w nazwach produktów służą tylko
-realizmowi danych; sklep, zamówienia i koszty są fikcyjne. Projekt czyta pięć tabel:
+Everything is synthetic: Data-Generator v1.7.1 (released 2026-11-24, MIT license) with seed 42 creates the shop Lumo
+and its costs; `scripts/get_data.py` rebuilds the data from that release. Brand names in product names are there only
+to make the data realistic; the shop, its orders and its costs are fictional. The project reads five tables:
 
 ```mermaid
 erDiagram
@@ -275,44 +280,44 @@ erDiagram
     }
 ```
 
-Pełny opis kolumn wejścia i wyniku: [docs/columns.md](docs/columns.md).
+Every input and output column: [docs/columns.md](docs/columns.md).
 
-## Struktura projektu
+## Project structure
 
-<details><summary>Pokaż drzewo</summary>
+<details><summary>Show the tree</summary>
 
 ```
-main.py                         wiersz poleceń: kaskada, stratne bestsellery, pliki CSV
-scripts/get_data.py             dane z Data-Generatora (tag, ziarno 42) do data/raw/
-scripts/make_charts.py          wykresy, zrzut karty produktu i bloki liczb w README
-scripts/make_demo_svg.py        animacja na górze README (zrzuty aplikacji, jasna i ciemna ramka)
-scripts/browser.py              headless Chrome przez DevTools (wykresy i zrzuty)
+main.py                         command line: cascade, loss-making bestsellers, CSV files
+scripts/get_data.py             data from Data-Generator (tag, seed 42) to data/raw/
+scripts/make_charts.py          charts, the product card screenshot and the numbers in README
+scripts/make_demo_svg.py        the animation at the top of README (app screenshots, light and dark frame)
+scripts/browser.py              headless Chrome through DevTools (charts and screenshots)
 src/product_profitability/
-  data.py                       wczytanie tabel i kontrakt kolumn kosztów
-  mock_costs.py                 zastępcze koszty dla wydań Data-Generatora sprzed 1.7.0
-  sql/line_costs.sql            koszty zamówienia rozpisane na linie (DuckDB)
-  margin.py                     kaskada marży i rozliczenie co do grosza
-  diagnose.py                   stratne bestsellery: powód i ruch
-  report.py, figures.py         dane, tytuły i wykresy wspólne dla aplikacji i README
-  i18n.py, theme.py             słowa po angielsku i po polsku, kolory i krój pisma
-ui/                             aplikacja Dash + Mantine
+  data.py                       loading the tables and the contract of the cost columns
+  mock_costs.py                 stand-in costs for Data-Generator releases before 1.7.0
+  sql/line_costs.sql            order costs spread over the lines (DuckDB)
+  margin.py                     margin cascade and the reconciliation to the grosz
+  diagnose.py                   loss-making bestsellers: reason and move
+  report.py, figures.py         data, titles and charts shared by the app and README
+  i18n.py, theme.py             English and Polish wording, colours and typeface
+ui/                             Dash + Mantine app
 tests/                          pytest
 ```
 
 </details>
 
-## Testy
+## Tests
 
 ```bash
 pip install -r requirements-dev.txt
 python -m pytest
 ```
 
-74 testy sprawdzają ręcznie policzony sklep, rozliczenie kosztów, reguły ruchów, wczytywanie danych, wykresy
-i aplikację bez przeglądarki; trwają kilka sekund i nie potrzebują pobranych danych.
+74 tests check the shop worked out by hand, the cost reconciliation, the rules of the moves, data loading, the charts
+and the app without a browser; they take a few seconds and need no downloaded data.
 
-## Licencja
+## License
 
-MIT, zobacz [LICENSE](LICENSE). [Changelog](CHANGELOG.md).
+MIT, see [LICENSE](LICENSE). [Changelog](CHANGELOG.md).
 
-Ostatnia aktualizacja README: 2026-11-24
+README last updated: 2026-11-24

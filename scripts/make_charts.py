@@ -1,12 +1,13 @@
 """
 README images and numbers in one run: the two charts (the same Plotly code as the app, drawn in headless Chrome with
-Inter from the repository), the app screenshots and every <!-- generated:... --> block of README.md.
+Inter from the repository), the product card screenshot and every <!-- generated:... --> block of README.md. The
+animated hero is scripts/make_demo_svg.py.
 
-    python scripts/make_charts.py                # Polish README (private repository), new app screenshots
-    python scripts/make_charts.py --lang en      # English README, before the repository goes public
-    python scripts/make_charts.py --no-app       # charts and numbers only, keep the screenshots
+    python scripts/make_charts.py                # English README, new product card screenshot
+    python scripts/make_charts.py --lang pl      # Polish README (a private copy of the project)
+    python scripts/make_charts.py --no-app       # charts and numbers only, keep the screenshot
 
-Needs the data from scripts/get_data.py, Chrome or Edge, and requirements-dev.txt (websockets).
+Needs the data from scripts/get_data.py, Chrome or Edge, and requirements-dev.txt (websockets, pillow).
 """
 from __future__ import annotations
 
@@ -130,7 +131,8 @@ def blocks(numbers: dict) -> dict[str, str]:
             f"- **What worked:** each of the {sources} costs is spread over products to the grosz (largest difference "
             f"{grosz} PLN). {n(losing_all)} of {n(sold)} products sold lose money, but only {len(losing)} of "
             f"them are bestsellers, so the list to act on is short.\n"
-            f"- **What missed:** the move “end free delivery” never fires ({moves.get('free_shipping', 0)} of "
+            '- **What missed:** the move "end free delivery" never fires '
+            f"({moves.get('free_shipping', 0)} of "
             f"{len(losing)}). {top_category.iloc[0]} of the {len(losing)} loss-making bestsellers are "
             f"{cat_name.lower()} sold in a few units (median {median_units}), so one return changes the result."),
         "cascade": (f"![{cascade_alt}](docs/img/margin-cascade.png)\n\n"
@@ -278,7 +280,7 @@ def run_app_shots() -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--lang", choices=i18n.LANGUAGES, default="pl", help="language of README.md")
+    parser.add_argument("--lang", choices=i18n.LANGUAGES, default="en", help="language of README.md")
     parser.add_argument("--no-app", action="store_true", help="keep the app screenshots as they are")
     args = parser.parse_args()
     IMG.mkdir(parents=True, exist_ok=True)

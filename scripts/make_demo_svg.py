@@ -1,7 +1,7 @@
 """
 Build docs/img/app-demo.svg and app-demo-dark.svg, the animated demo at the top of the README.
 
-    python scripts/make_demo_svg.py [--shots DIR] [--reuse] [--quality 72] [--res 1.25] [--lang pl]
+    python scripts/make_demo_svg.py [--shots DIR] [--reuse] [--quality 72] [--res 1.25] [--lang en|pl]
 
 The demo is an illustration made of screenshots of the real app, not a recording. One loop of 13 s: the view rests
 on the loss-making bestsellers, the cursor drags the bestseller slider from the top 500 to the top 200 (the value
@@ -474,7 +474,7 @@ def main() -> None:
     parser.add_argument("--reuse", action="store_true", help="build from --shots without starting the app")
     parser.add_argument("--quality", type=int, default=72, help="WebP quality of the screenshots")
     parser.add_argument("--res", type=float, default=1.25, help="image pixels per SVG pixel")
-    parser.add_argument("--lang", choices=("pl", "en"), default="pl", help="language of the description")
+    parser.add_argument("--lang", choices=("pl", "en"), default="en", help="language of the description")
     args = parser.parse_args()
     make(args.shots, args.reuse, args.quality, args.res, args.lang)
 
