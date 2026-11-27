@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from product_profitability import diagnose, figures, margin, report
+from product_profitability import diagnose, figures, i18n, margin, report
 from product_profitability import theme as t
 
 
@@ -166,3 +166,20 @@ def test_category_that_loses_money_is_drawn_left_of_zero():
     fig = figures.category_kept(data)
     assert fig.layout.xaxis.range[0] < -0.2 and len(fig.layout.shapes) == 1
     assert fig.data[0].text[0] == "−20%"
+
+
+@pytest.mark.parametrize("count, word", [(0, "traci"), (1, "traci"), (2, "tracą"), (4, "tracą"), (5, "traci"),
+                                         (12, "traci"), (14, "traci"), (22, "tracą"), (44, "tracą"), (112, "traci"),
+                                         (2164, "tracą"), (2167, "traci")])
+def test_polish_verb_agrees_with_the_count(count, word):
+    assert i18n.plural_pl(count, "traci", "tracą", "traci") == word
+
+
+def test_polish_loss_title_agrees_with_the_count(products):
+    losing = diagnose.loss_making_bestsellers(products, diagnose.Rules(bestsellers=2), "pl")
+    title, subtitle = report.loss_title(losing, diagnose.Rules(bestsellers=2), "pl")
+    assert title.startswith("1 z 2 bestsellerów traci pieniądze, razem −")
+    assert subtitle.startswith("Bestsellery to 2 produkty z najwyższym")
+    doubled = pd.concat([losing] * 44, ignore_index=True)
+    assert report.loss_title(doubled, diagnose.Rules(bestsellers=500), "pl")[0].startswith(
+        "44 z 500 bestsellerów tracą pieniądze")

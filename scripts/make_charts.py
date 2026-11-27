@@ -90,15 +90,17 @@ def blocks(numbers: dict) -> dict[str, str]:
     low_kept, high_kept = p(lowest["kept"]), p(highest["kept"])
 
     if language == "pl":
+        lose = i18n.plural_pl(len(losing), "traci", "tracą", "traci")  # "44 z 500 bestsellerów tracą"
+        are = i18n.plural_pl(losing_all, "jest", "są", "jest")
         return {
             "result": (f"**Wynik.** Z {c(lm)} zł marży z cennika zostaje {c(tm)} zł, czyli {p(tm / lm)}. Najwięcej "
                        f"zabierają {first['label'].lower()} ({c(first['amount'])} zł) i "
                        f"{second['label'].lower()} ({c(second['amount'])} zł). {len(losing)} z {rules.bestsellers} "
-                       f"bestsellerów traci pieniądze, razem {c(-losing['true_margin'].sum())} zł."),
+                       f"bestsellerów {lose} pieniądze, razem {c(-losing['true_margin'].sum())} zł."),
             "hero": hero,
             "summary": (
                 f"- **Trafione:** każdy z {sources} kosztów rozkłada się na produkty co do grosza (największa różnica "
-                f"{grosz} zł). Na minusie jest {n(losing_all)} z {n(sold)} sprzedanych produktów, ale tylko "
+                f"{grosz} zł). Na minusie {are} {n(losing_all)} z {n(sold)} sprzedanych produktów, ale tylko "
                 f"{len(losing)} z nich to bestsellery, więc lista do decyzji jest krótka.\n"
                 f"- **Chybione:** ruch „bez darmowej dostawy” nie pada ani razu ({moves.get('free_shipping', 0)} "
                 f"z {len(losing)}). {top_category.iloc[0]} z {len(losing)} stratnych bestsellerów to "

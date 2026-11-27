@@ -21,13 +21,13 @@ i jeden ruch: zmianę ceny, koniec darmowej dostawy albo wycofanie z oferty.
 
 <!-- generated:result -->
 **Wynik.** Z 16,5 mln zł marży z cennika zostaje 10,1 mln zł, czyli 61%. Najwięcej zabierają zwroty (2,49 mln zł) i
-rabaty (2,47 mln zł). 44 z 500 bestsellerów traci pieniądze, razem 73,0 tys. zł.
+rabaty (2,47 mln zł). 44 z 500 bestsellerów tracą pieniądze, razem 73,0 tys. zł.
 <!-- /generated:result -->
 
 <!-- generated:hero -->
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/img/app-demo-dark.svg">
-  <img alt="Aplikacja Product Profitability w ilustracji: suwak bestsellerów przesuwa się z top 500 na top 200, liczba stratnych bestsellerów zmienia się z 44 na 20, a strata razem z −73,0 tys. na −34,0 tys. zł; kliknięcie produktu Laptop Lenovo IdeaPad Slim 5 (szary) w tabeli otwiera jego kartę z kaskadą marży i listą zamówień." src="docs/img/app-demo.svg">
+  <img alt="Aplikacja Product Profitability w ilustracji: suwak bestsellerów przesuwa się z top 500 na top 200, liczba stratnych bestsellerów zmienia się z 44 na 20, a strata razem z −73,0 tys. na −34,0 tys. zł; kliknięcie produktu Laptop Lenovo IdeaPad Slim 5 (szary) w tabeli otwiera jego kartę z kaskadą marży i listą zamówień." src="docs/img/app-demo.svg">
 </picture>
 <!-- /generated:hero -->
 
@@ -132,7 +132,7 @@ Suwaki w aplikacji zmieniają liczbę bestsellerów i limit podwyżki ceny, a li
 **Wynik.**
 
 <!-- generated:losses -->
-44 z 500 bestsellerów traci pieniądze, razem −73,0 tys. zł. Ruchy: zmiana ceny 33, koniec darmowej dostawy 0, wycofanie
+44 z 500 bestsellerów tracą pieniądze, razem −73,0 tys. zł. Ruchy: zmiana ceny 33, koniec darmowej dostawy 0, wycofanie
 11. Dziesięć największych strat:
 
 | # | Produkt | Kategoria | Sztuki | Marża na czysto | Główny koszt | Ruch |

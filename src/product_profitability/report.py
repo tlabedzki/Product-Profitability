@@ -182,8 +182,10 @@ def loss_title(losing: pd.DataFrame, rules: Rules | None = None, language: str =
         if count == 0:
             return (f"Każdy z {rules.bestsellers} bestsellerów zarabia po wszystkich kosztach sprzedaży",
                     "Bestsellery to produkty z najwyższym przychodem netto.")
-        return (f"{count} z {rules.bestsellers} bestsellerów traci pieniądze, razem {compact(loss, 'pl', 'zł')}",
-                f"Bestsellery to {rules.bestsellers} produktów z najwyższym przychodem netto. Przy każdym koszt, który "
+        lose = i18n.plural_pl(count, "traci", "tracą", "traci")
+        noun = i18n.plural_pl(rules.bestsellers, "produkt", "produkty", "produktów")
+        return (f"{count} z {rules.bestsellers} bestsellerów {lose} pieniądze, razem {compact(loss, 'pl', 'zł')}",
+                f"Bestsellery to {rules.bestsellers} {noun} z najwyższym przychodem netto. Przy każdym koszt, który "
                 f"go pogrążył, i jeden ruch: zmiana ceny, koniec darmowej dostawy albo wycofanie.")
     if count == 0:
         title = f"All top {rules.bestsellers} bestsellers make money after every selling cost"

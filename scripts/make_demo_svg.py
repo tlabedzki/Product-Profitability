@@ -89,11 +89,14 @@ def numbers() -> dict:
     out = {}
     for n in (START, END):
         losing = diagnose.loss_making_bestsellers(products, bestseller_rules(n))
-        out[n] = {"count": f"{len(losing):,}", "loss": report.compact(float(losing["true_margin"].sum())),
-                  "rows": len(losing)}
+        loss = float(losing["true_margin"].sum())
+        out[n] = {"count": f"{len(losing):,}", "loss": report.compact(loss), "rows": len(losing),
+                  "count_pl": f"{len(losing):,}".replace(",", " "), "loss_pl": report.compact(loss, "pl")}
     table = report.loss_table(diagnose.loss_making_bestsellers(products, bestseller_rules(END)))
     pick = table.iloc[CLICK_ROW - 1]
     out["product_id"], out["product"] = int(pick["product_id"]), pick["product"]
+    out["product_pl"] = report.loss_table(diagnose.loss_making_bestsellers(products, bestseller_rules(END)),
+                                          "pl").iloc[CLICK_ROW - 1]["product"]
     first = report.loss_table(diagnose.loss_making_bestsellers(products, bestseller_rules(START))).iloc[0]
     out["start_product"] = first["product"]
     return out
@@ -104,9 +107,9 @@ def alt_text(values: dict, language: str = "pl") -> str:
     start, end = values[START], values[END]
     if language == "pl":
         return (f"Aplikacja Product Profitability w ilustracji: suwak bestsellerów przesuwa się z top {START} na top "
-                f"{END}, liczba stratnych bestsellerów zmienia się z {start['count']} na {end['count']}, a strata "
-                f"razem z {start['loss']} na {end['loss']} PLN; kliknięcie produktu {values['product']} w tabeli "
-                f"otwiera jego kartę z kaskadą marży i listą zamówień.")
+                f"{END}, liczba stratnych bestsellerów zmienia się z {start['count_pl']} na {end['count_pl']}, "
+                f"a strata razem z {start['loss_pl']} na {end['loss_pl']} zł; kliknięcie produktu "
+                f"{values['product_pl']} w tabeli otwiera jego kartę z kaskadą marży i listą zamówień.")
     return (f"Product Profitability app, illustrated: the bestseller slider moves from the top {START} to the top "
             f"{END}, loss-making bestsellers go from {start['count']} to {end['count']} and the loss together from "
             f"{start['loss']} to {end['loss']} PLN; a click on {values['product']} in the table opens its product "

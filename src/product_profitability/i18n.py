@@ -50,6 +50,19 @@ def month(stamp, language: str = "en") -> str:
     return f"{MONTHS_PL[stamp.month - 1]} {stamp.year}" if language == "pl" else f"{stamp:%b %Y}"
 
 
+def plural_pl(count: int, one: str, few: str, many: str) -> str:
+    """
+    The Polish word that agrees with a count: 1 -> one, 2-4 (also 22-24, but not 12-14) -> few, else many.
+    `plural_pl(44, "traci", "tracą", "traci")` gives "tracą" for "44 z 500 bestsellerów tracą".
+    """
+    count = abs(int(count))
+    if count == 1:
+        return one
+    if count % 10 in (2, 3, 4) and count % 100 not in (12, 13, 14):
+        return few
+    return many
+
+
 def check(language: str) -> str:
     if language not in LANGUAGES:
         raise ValueError(f"Unknown language {language!r}; use one of {', '.join(LANGUAGES)}")
