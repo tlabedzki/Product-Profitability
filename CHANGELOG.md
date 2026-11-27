@@ -3,6 +3,16 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [1.0.2] - 2026-11-27
+
+### Added
+
+- A Polish version of the README (`READMEPL.md`) with an English | Polski link under the title of both files.
+
+### Fixed
+
+- Polish README texts from `scripts/make_charts.py` and `scripts/make_demo_svg.py` agree with the count (Polish plural forms), and the demo alt text uses Polish number notation.
+
 ## [1.0.1] - 2026-11-27
 
 ### Added
