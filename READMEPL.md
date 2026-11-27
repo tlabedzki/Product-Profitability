@@ -1,6 +1,6 @@
 # Product Profitability
 
-Polskie tłumaczenie dla autora. Wersją wiodącą jest [README.md](README.md) po angielsku.
+[English](README.md) | **Polski**
 
 [![Tests](https://github.com/tlabedzki/Product-Profitability/actions/workflows/tests.yml/badge.svg)](https://github.com/tlabedzki/Product-Profitability/actions/workflows/tests.yml)
 ![Python 3.11](https://img.shields.io/badge/python-3.11-3776AB)
@@ -42,7 +42,7 @@ rabaty (2,47 mln zł). 44 z 500 bestsellerów traci pieniądze, razem 73,0 tys
 
 ## 1. Sklep i pytania właściciela
 
-Lumo to fikcyjny polski sklep internetowy z danymi z [Data-Generator](https://github.com/tlabedzki/Data-Generator):
+Lumo to fikcyjny polski sklep internetowy z danymi z [Data-Generatora](https://github.com/tlabedzki/Data-Generator):
 dwa lata zamówień, zwrotów, paczek i płatności. Właściciel zna marżę z cennika i chce wiedzieć trzy rzeczy:
 
 - ile z tej marży zostaje po wszystkich kosztach sprzedaży i który koszt zabiera najwięcej (rozdział 3);
@@ -123,7 +123,7 @@ bestsellera kod wskazuje koszt, który zabrał najwięcej. Potem wybiera ruch we
 
 - **Zmień cenę:** ogranicz rabat do poziomu, przy którym produkt wychodzi na zero (break even, czyli przychód pokrywa
   wszystkie koszty), albo podnieś cenę, jeśli wystarczy podwyżka do 10%.
-- **Bez darmowej dostawy:** gdy najwięcej zabiera wysyłka, a co najmniej połowa zamówień jechała z darmową dostawą.
+- **Bez darmowej dostawy:** gdy najwięcej zabiera wysyłka, a co najmniej połowa zamówień miała darmową dostawę.
 - **Wycofaj:** gdy zwrotów jest co najmniej dwa razy więcej niż średnio w kategorii albo wyjście na zero wymaga
   podwyżki ceny powyżej 10%.
 
