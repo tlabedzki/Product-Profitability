@@ -282,6 +282,21 @@ erDiagram
 
 Every input and output column: [docs/columns.md](docs/columns.md).
 
+## Why these tools
+
+Each tool was picked for how this project reads its data: one run reads five generated tables from local Parquet
+files, spreads the costs of every order over its lines, sums them per product and reconciles the total to the grosz.
+A fresh clone rebuilds everything with two commands, with no server, account, key or paid service.
+
+| Tool | What it does here and why it fits | Alternative considered |
+|---|---|---|
+| Data Generator | Generates the fictional shop and, since v1.7.0, its selling costs: carrier cost, return handling and write-offs, payment fees and affiliate commission. | Cost rates in one file of this project, as a real shop takes them from its contracts: dropped for cost columns in Data Generator, so the costs come from the same generator as the rest of the portfolio. |
+| pandas, numpy and pyarrow | Read only the needed columns of the Parquet tables after checking their schema, and build the margin cascade and the list of loss-making bestsellers; the versions match Data Generator, which runs in this project's environment. | – |
+| DuckDB | Runs the SQL query (`sql/line_costs.sql`) that spreads the carrier cost by parcel weight and the payment fee by line value over the lines of each order, straight on the pandas frames and without a server. | – |
+| Plotly | Draws the charts of the app and of the README from the same functions, so both show the same numbers. | – |
+| Dash and Mantine | The app with the cascade, the bestseller sliders and the product card, built from the same blocks as every app in this portfolio. | Streamlit and Gradio were ruled out for all apps in the portfolio: they sit side by side on the GitHub profile and a different look stands out. |
+| pytest | Tests a shop worked out by hand, the reconciliation and the rules of the moves without downloaded data; every stage has a negative test that must fail on broken data. | – |
+
 ## Project structure
 
 <details><summary>Show the tree</summary>
@@ -320,4 +335,4 @@ and the app without a browser; they take a few seconds and need no downloaded da
 
 MIT, see [LICENSE](LICENSE). [Changelog](CHANGELOG.md).
 
-README last updated: 2026-11-24
+README last updated: 2026-11-27

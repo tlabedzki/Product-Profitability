@@ -1,6 +1,6 @@
 [project]
 name = "product-profitability"
-version = "1.0.0"
+version = "1.0.1"
 description = "True product-level margin of a fictional online shop after shipping, returns, payment and commission costs"
 requires-python = ">=3.11"
 license = "MIT"
