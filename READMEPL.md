@@ -1,11 +1,10 @@
 # Product Profitability
 
-[English](README.md) | **Polski**
-
 [![Tests](https://github.com/tlabedzki/Product-Profitability/actions/workflows/tests.yml/badge.svg)](https://github.com/tlabedzki/Product-Profitability/actions/workflows/tests.yml)
 ![Python 3.11](https://img.shields.io/badge/python-3.11-3776AB)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 [![Release](https://img.shields.io/github/v/release/tlabedzki/Product-Profitability)](https://github.com/tlabedzki/Product-Profitability/releases)
+[![English](docs/img/flag-gb.svg "English")](README.md)
 
 Studium przypadku (case study) i aplikacja: ile naprawdę zarabia każdy produkt fikcyjnego sklepu internetowego po
 rabatach, zwrotach, wysyłce, opłatach za płatności i prowizjach.
@@ -334,7 +333,7 @@ pip install -r requirements-dev.txt
 python -m pytest
 ```
 
-74 testy sprawdzają sklep policzony ręcznie, uzgodnienie kosztów, zasady ruchów, wczytywanie danych, wykresy
+91 testów sprawdza sklep policzony ręcznie, uzgodnienie kosztów, zasady ruchów, wczytywanie danych, wykresy
 i aplikację bez przeglądarki. Trwają kilka sekund i nie potrzebują pobranych danych.
 
 ## Licencja

@@ -1,11 +1,10 @@
 # Product Profitability
 
-**English** | [Polski](READMEPL.md)
-
 [![Tests](https://github.com/tlabedzki/Product-Profitability/actions/workflows/tests.yml/badge.svg)](https://github.com/tlabedzki/Product-Profitability/actions/workflows/tests.yml)
 ![Python 3.11](https://img.shields.io/badge/python-3.11-3776AB)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 [![Release](https://img.shields.io/github/v/release/tlabedzki/Product-Profitability)](https://github.com/tlabedzki/Product-Profitability/releases)
+[![Polski](docs/img/flag-pl.svg "Polski")](READMEPL.md)
 
 A case study and an app: what each product of a fictional online shop really earns after discounts, returns,
 shipping, payment fees and commissions.
@@ -330,7 +329,7 @@ pip install -r requirements-dev.txt
 python -m pytest
 ```
 
-74 tests check the shop worked out by hand, the cost reconciliation, the rules of the moves, data loading, the charts
+91 tests check the shop worked out by hand, the cost reconciliation, the rules of the moves, data loading, the charts
 and the app without a browser; they take a few seconds and need no downloaded data.
 
 ## License
