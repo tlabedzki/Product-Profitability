@@ -333,7 +333,7 @@ pip install -r requirements-dev.txt
 python -m pytest
 ```
 
-91 testów sprawdza sklep policzony ręcznie, uzgodnienie kosztów, zasady ruchów, wczytywanie danych, wykresy
+92 testy sprawdzają sklep policzony ręcznie, uzgodnienie kosztów, zasady ruchów, wczytywanie danych, wykresy
 i aplikację bez przeglądarki. Trwają kilka sekund i nie potrzebują pobranych danych.
 
 ## Licencja

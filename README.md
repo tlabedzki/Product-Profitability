@@ -329,7 +329,7 @@ pip install -r requirements-dev.txt
 python -m pytest
 ```
 
-91 tests check the shop worked out by hand, the cost reconciliation, the rules of the moves, data loading, the charts
+92 tests check the shop worked out by hand, the cost reconciliation, the rules of the moves, data loading, the charts
 and the app without a browser; they take a few seconds and need no downloaded data.
 
 ## License
